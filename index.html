@@ -486,8 +486,13 @@ function persist(){
 function touchSession(){
   const s=cur();if(!s)return;
   s.updatedAt=nowISO();
-  clearTimeout(saveTimer);saveTimer=setTimeout(persist,300);
+  clearTimeout(saveTimer);saveTimer=setTimeout(()=>{saveTimer=null;persist();},300);
 }
+/* il salvataggio è differito di 300ms: se la pagina viene chiusa o messa in
+   background prima, va scritto subito, altrimenti si perdono gli ultimi input */
+function flushSave(){if(saveTimer){clearTimeout(saveTimer);saveTimer=null;persist();}}
+window.addEventListener("pagehide",flushSave);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")flushSave();});
 function cur(){return state.currentId?state.sessions[state.currentId]:null;}
 
 /* ---------- Utility DOM ---------- */
