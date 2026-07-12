@@ -16,6 +16,7 @@ const ctx={console};
 vm.createContext(ctx);
 const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_ID","domName",
   "CATS","TESTS","TEST_BY_ID","BATTERIA_BASE","VALIDITA","validitaInterferenze",
+  "TEST_GUIDES","testGuide","who5Score","guidedNext",
   "newSession","newSomm","validateCode","validateAnagrafica","validateSomm",
   "MSG_NO_NORME","validateNormPack","scoreTest","testsOfDomain","domainProfile","profileHash",
   "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
@@ -61,14 +62,29 @@ t("catalogo: campi richiesti presenti su ogni test",()=>{
     "digitale","soloManuale","normeIntegrate","noteCliniche","configV","statoConfig"];
   L.TESTS.forEach(x=>campi.forEach(c=>ok(c in x,"manca "+c+" in "+x.id)));
 });
-t("catalogo: nessun test con norme integrate, materiali o cut-off; licenze da verificare",()=>{
+t("catalogo: strumenti protetti manuali; strumenti aperti identificati",()=>{
   L.TESTS.forEach(x=>{
     eq(x.normeIntegrate,false,x.id+" risulta con norme integrate");
     eq(x.fonteNormativa,null,x.id+" ha una fonte normativa nel codice");
-    eq(x.soloManuale,true,x.id+" non è a sola registrazione manuale");
-    ok(x.licenza==="da-verificare"||x.licenza==="generico","licenza inattesa in "+x.id);
+    if(x.licenza==="aperta"){eq(x.soloManuale,false,x.id+" aperto ma solo manuale");ok(x.digitale,x.id+" aperto ma non digitale");}
+    else eq(x.soloManuale,true,x.id+" non è a sola registrazione manuale");
+    ok(["da-verificare","generico","aperta"].includes(x.licenza),"licenza inattesa in "+x.id);
   });
   ok(!/cut-?off\s*[:=]\s*\d/i.test(html),"possibile cut-off numerico nel codice");
+});
+t("WHO-5: fonte, cinque item e scoring completo",()=>{
+  ok(L.TEST_BY_ID.who5&&L.TEST_BY_ID.who5.licenza==="aperta");
+  eq(L.TEST_GUIDES.who5.items.length,5);
+  eq(L.who5Score({risposte:{0:5,1:4,2:3,3:2,4:1}}),{grezzo:15,percentuale:60,approfondire:true});
+  eq(L.who5Score({risposte:{0:5,1:5}}),null);
+});
+t("flusso guidato: apre la prima prova incompleta e propone approfondimento WHO-5",()=>{
+  const s=L.newSession("QA-FLOW");s.batteria=["who5","orientamento"];
+  eq(L.guidedNext(s).test,"who5");
+  s.somministrazioni.who5=Object.assign(L.newSomm(),{stato:"completato",risposte:{0:1,1:1,2:1,3:1,4:1}});
+  eq(L.guidedNext(s).add,"depressione");
+  s.batteria.push("depressione");
+  eq(L.guidedNext(s).test,"orientamento");
 });
 t("catalogo: i gruppi richiesti sono coperti",()=>{
   const bySigla=Object.fromEntries(L.TESTS.map(x=>[x.sigla,x]));

@@ -52,8 +52,23 @@ classificare), tipi di errore, stato della licenza, stato di configurazione.
 
 - Nessuno stimolo, istruzione o materiale di test protetto.
 - Nessuna norma, percentile, equivalente, cut-off o formula di correzione integrata.
-- Tutti i test pubblicati: **licenza da verificare**, **sola registrazione manuale**.
+- Gli strumenti protetti restano **licenza da verificare** e **sola registrazione manuale**;
+  gli strumenti aperti riportano fonte e licenza e possono avere una compilazione guidata.
 - Nessuna diagnosi automatica: classificazioni e giudizi sono sempre del clinico.
+
+## Somministrazione guidata (v5)
+
+- Due interfacce nello stesso dispositivo: **medico**, con spiegazione prima/durante/dopo,
+  registrazione e motivazione del prossimo passaggio; **assistito**, che nasconde dati clinici,
+  interpretazioni e strumenti riservati.
+- Il pulsante “Apri il prossimo passaggio” segue una regola trasparente: prima prova incompleta,
+  revisione del profilo, quindi approfondimenti di secondo livello. Il medico mantiene sempre il
+  controllo della batteria.
+- Primo strumento completo: **WHO-5 italiano**, fonte OMS 2024, licenza
+  CC BY-NC-SA 3.0 IGO. Calcola solo grezzo 0–25 e percentuale; l’eventuale proposta di
+  approfondimento dell’umore riprende l’indicazione della fonte e non è una diagnosi.
+- MoCA, MMSE e gli altri strumenti protetti restano schede guidate senza item o istruzioni:
+  richiedono materiale originale, versione e autorizzazioni appropriate.
 
 ## Motore di scoring
 

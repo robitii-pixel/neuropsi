@@ -99,6 +99,15 @@ details.test-card .body{padding:0 .8rem .8rem;border-top:1px solid var(--line)}
 .stato-row{display:flex;gap:.4rem;flex-wrap:wrap;margin:.4rem 0}
 .stato-row button{font-size:.85rem;padding:.45rem .7rem}
 .stato-row button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.mode-switch{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 1rem}
+.mode-switch button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin:.7rem 0}
+.flow .node{border:1px solid var(--line);border-radius:10px;padding:.65rem;background:#fff;font-size:.85rem}
+.flow .node.active{border:2px solid var(--brand);background:#e7f0fa}
+.assist-card{max-width:760px;margin:0 auto;background:#fff;border:2px solid var(--brand);border-radius:14px;padding:1.2rem}
+.assist-item{border-top:1px solid var(--line);padding:.9rem 0}
+.assist-item select{margin-top:.4rem}
+@media(max-width:720px){.flow{grid-template-columns:1fr}.assist-card{border-width:1px;padding:.8rem}}
 /* battery selection */
 .bat-group{margin:0 0 1rem}
 .bat-item{display:flex;gap:.6rem;align-items:flex-start;padding:.45rem 0;border-bottom:1px dashed var(--line)}
@@ -172,7 +181,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v4";
+const APPV="v5";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -230,9 +239,9 @@ function T(id,sigla,nome,cat,dom,domSec,opts){
     min:opts.min==null?null:opts.min,max:opts.max==null?null:opts.max,
     usaTempo:!!opts.tempo,tipiErrore:opts.err||[],
     fonteNormativa:null,biblio:null,
-    licenza:opts.lic||"da-verificare",
-    digitale:false,soloManuale:true,normeIntegrate:false,
-    noteCliniche:opts.note||"",configV:1,statoConfig:"registrazione-manuale"};
+    licenza:opts.aperto?"aperta":(opts.lic||"da-verificare"),
+    digitale:!!opts.aperto,soloManuale:!opts.aperto,normeIntegrate:false,
+    noteCliniche:opts.note||"",configV:1,statoConfig:opts.aperto?"somministrazione-guidata":"registrazione-manuale"};
 }
 const TESTS=[
   /* screening e orientamento */
@@ -288,6 +297,7 @@ const TESTS=[
   /* funzionamento, umore, comportamento */
   T("adl","ADL","Attività di base della vita quotidiana","funzionale","autonomia",[],{dur:5,note:"Intervista a paziente e/o caregiver."}),
   T("iadl","IADL","Attività strumentali della vita quotidiana","funzionale","autonomia",[],{dur:5,note:"Intervista a paziente e/o caregiver."}),
+  T("who5","WHO-5","Indice OMS-5 di benessere","funzionale","umore",[],{min:0,max:25,dur:3,aperto:true,note:"Questionario completo disponibile nell’app; fonte OMS 2024, CC BY-NC-SA 3.0 IGO."}),
   T("depressione","DEP","Scala per sintomi depressivi","funzionale","umore",[],{dur:8}),
   T("ansia","ANS","Scala per sintomi ansiosi","funzionale","umore",[],{dur:8}),
   T("apatia","APA","Scala per apatia","funzionale","comportamento",["umore"],{dur:8}),
@@ -298,10 +308,45 @@ const TESTS=[
   T("validita-perf","VAL","Prova di validità della prestazione","funzionale","comportamento",[],{dur:10,note:"Misura di performance validity: registrare solo l'esito secondo il manuale dello strumento usato."})
 ];
 const TEST_BY_ID=Object.fromEntries(TESTS.map(t=>[t.id,t]));
+
+/* Schede operative. Gli strumenti protetti restano registrazione manuale.
+   WHO-5 è riprodotto dalla versione italiana ufficiale OMS, licenza
+   CC BY-NC-SA 3.0 IGO, WHO/UCN/MSD/MHE/2024.1. */
+const TEST_GUIDES={
+  orientamento:{tipo:"generico",chi:"medico",scopo:"Descrivere orientamento personale, temporale e spaziale nel colloquio clinico.",
+    prima:"Verificare lingua, udito e possibilità di rispondere.",durante:"Porre domande naturali senza suggerire la risposta; annotare esitazioni e autocorrezioni.",dopo:"Registrare una sintesi qualitativa. Non è una prova standardizzata e non produce una classificazione automatica."},
+  mmse:{tipo:"protetto",chi:"medico",scopo:"Screening cognitivo globale.",prima:"Usare esclusivamente il modulo e il manuale originali nella versione autorizzata.",durante:"Seguire alla lettera consegne, tempi e regole del manuale.",dopo:"Inserire qui punteggio e classificazione ricavati dalle norme appropriate. L'app non mostra item né calcola norme."},
+  moca:{tipo:"protetto",chi:"medico",scopo:"Screening multidominio, con particolare sensibilità alle difficoltà lievi.",prima:"Accedere al materiale ufficiale; formazione e certificazione possono essere obbligatorie.",durante:"Non modificare consegne o stimoli e non esporre il test in modalità assistito.",dopo:"Registrare il risultato ottenuto secondo la documentazione ufficiale."},
+  depressione:{tipo:"manuale",chi:"medico",scopo:"Approfondire sintomi depressivi con lo strumento scelto dal clinico.",prima:"Scegliere uno strumento validato e legalmente disponibile per lingua e popolazione.",durante:"In presenza di contenuti di rischio, interrompere il solo percorso digitale e procedere alla valutazione clinica diretta.",dopo:"Registrare strumento, versione, punteggio e osservazioni."},
+  "who5":{tipo:"aperto",chi:"assistito",scopo:"Misurare il benessere mentale riferito nelle ultime due settimane.",
+    prima:"La persona risponde autonomamente, oppure il medico legge senza parafrasare.",durante:"Scegliere una risposta per ciascuna delle cinque affermazioni.",dopo:"Il punteggio grezzo è la somma delle risposte (0–25); il percentuale è il grezzo × 4. Non formula diagnosi.",
+    fonte:"World Health Organization, WHO-5, 2024 — CC BY-NC-SA 3.0 IGO",
+    items:["Mi sono sentito/a allegro/a e di buon umore","Mi sono sentito/a calmo/a e rilassato/a","Mi sono sentito/a attivo/a ed energico/a","Mi sono svegliato/a sentendomi fresco/a e riposato/a","La mia vita di tutti i giorni è stata piena di cose che mi interessano"]}
+};
+const DEFAULT_GUIDE={tipo:"manuale",chi:"medico",scopo:"Esplorare "+"il dominio indicato nel catalogo.",
+  prima:"Preparare il materiale originale e verificare che versione, lingua ed età siano appropriate.",
+  durante:"Seguire le istruzioni standardizzate dello strumento e annotare gli aspetti qualitativi.",
+  dopo:"Registrare grezzo, tempi, errori e classificazione secondo il manuale. L'app non sostituisce le norme."};
+function testGuide(id){return TEST_GUIDES[id]||DEFAULT_GUIDE;}
+function who5Score(e){
+  const r=e&&e.risposte||{};const vals=[0,1,2,3,4].map(i=>r[i]);
+  if(vals.some(v=>!Number.isInteger(v)||v<0||v>5))return null;
+  const grezzo=vals.reduce((a,b)=>a+b,0);return {grezzo,percentuale:grezzo*4,approfondire:grezzo<13||vals.some(v=>v<=1)};
+}
+function guidedNext(s){
+  if(!(s.batteria||[]).length)return {view:"batteria",titolo:"Componi la batteria",motivo:"Non è ancora stata scelta alcuna prova."};
+  const w=s.somministrazioni.who5&&who5Score(s.somministrazioni.who5);
+  if(w&&w.approfondire&&!s.batteria.includes("depressione"))
+    return {view:"batteria",add:"depressione",titolo:"Valuta un approfondimento dell’umore",motivo:"Il WHO-5 suggerisce di completare la valutazione con un questionario diagnostico della depressione; la decisione resta al medico."};
+  const next=s.batteria.find(id=>!s.somministrazioni[id]||s.somministrazioni[id].stato==="da-fare");
+  if(next)return {view:"prove",test:next,titolo:"Prossima prova: "+TEST_BY_ID[next].nome,motivo:"È la prima prova prevista nella batteria che non risulta ancora conclusa."};
+  if(!s.profilo.confermatoAt)return {view:"profilo",titolo:"Rivedi il profilo",motivo:"Tutte le prove previste hanno uno stato registrato."};
+  return {view:"secondo",titolo:"Valuta gli approfondimenti",motivo:"Il profilo è confermato: ora l’app mostra le proposte motivate di secondo livello."};
+}
 /* batteria di base suggerita (modificabile liberamente dal clinico) */
 const BATTERIA_BASE=["orientamento","mmse","digit-avanti","digit-indietro","tmt-a","tmt-b",
   "lista-appr","lista-diff","lista-ric","denominazione","fluenza-fon","fluenza-sem",
-  "copia-disegni","orologio","prassia-im","adl","iadl","depressione","comportamentale","validita-perf"];
+  "copia-disegni","orologio","prassia-im","adl","iadl","who5","comportamentale","validita-perf"];
 
 /* ---------- Condizioni di validità ---------- */
 const VALIDITA=[
@@ -331,7 +376,7 @@ function nowISO(){return new Date().toISOString();}
 function uid(){return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 function newSomm(){
   return {stato:"da-fare",motivo:"",grezzo:"",corretto:"",tempoSec:"",errori:"",
-    autocorrezioni:"",intrusioni:"",perseverazioni:"",classif:"na",note:""};
+    autocorrezioni:"",intrusioni:"",perseverazioni:"",classif:"na",note:"",risposte:{}};
 }
 function newSession(code){
   return {
@@ -342,7 +387,7 @@ function newSession(code){
     validita:{valori:{},caregiverPresente:"",note:""},
     batteria:[],
     somministrazioni:{},
-    osservazioni:"",
+    osservazioni:"",modalita:"medico",
     profilo:{override:{},confermatoAt:null,basato:""},
     secondLevel:{basato:"",items:[]},
     confronto:{withId:"",nota:""},
@@ -913,10 +958,14 @@ function sanitizeSession(raw){
       if(["da-fare","completato","non-eseguito","non-interpretabile"].includes(e.stato))t.stato=e.stato;
       if(RATINGS.some(r=>r.id===e.classif))t.classif=e.classif;
       copyStr(t,e,["motivo","grezzo","corretto","tempoSec","errori","autocorrezioni","intrusioni","perseverazioni","note"]);
+      if(e.risposte&&typeof e.risposte==="object")Object.keys(e.risposte).forEach(k=>{
+        const v=e.risposte[k];if(Number.isInteger(v)&&v>=0&&v<=5)t.risposte[k]=v;
+      });
       base.somministrazioni[tid]=t;
     });
   }
   if(typeof raw.osservazioni==="string")base.osservazioni=raw.osservazioni;
+  if(raw.modalita==="assistito"||raw.modalita==="medico")base.modalita=raw.modalita;
   if(raw.profilo&&typeof raw.profilo==="object"){
     if(typeof raw.profilo.confermatoAt==="string")base.profilo.confermatoAt=raw.profilo.confermatoAt;
     if(typeof raw.profilo.basato==="string")base.profilo.basato=raw.profilo.basato;
@@ -1335,8 +1384,8 @@ function viewBatteria(){
         <input type="checkbox" id="bt_${t.id}" data-battery="${t.id}" ${sel.has(t.id)?"checked":""} aria-label="Includi ${esc(t.nome)}">
         <div>
           <label for="bt_${t.id}" style="margin:0;display:inline" class="nm">${t.nome} <span class="muted">(${t.sigla})</span></label>
-          <span class="badge lic">${t.licenza==="generico"?"prova generica":"licenza da verificare"}</span>
-          <span class="badge lic">solo punteggi manuali</span>
+          <span class="badge lic">${t.licenza==="generico"?"prova generica":(t.licenza==="aperta"?"licenza aperta":"licenza da verificare")}</span>
+          <span class="badge lic">${t.soloManuale?"solo punteggi manuali":"compilabile nell’app"}</span>
           <span class="badge lic">${t.normeIntegrate?"norme configurate":"norme non integrate"}</span>
           <div class="muted small">Dominio: ${domName(t.dom)}${t.domSec.length?" (+ "+t.domSec.map(domName).join(", ")+")":""}${t.durataMin?" — ~"+t.durataMin+" min":""}${t.noteCliniche?" — "+esc(t.noteCliniche):""}</div>
         </div>
@@ -1368,8 +1417,35 @@ function sommField(tid,k,label,val,err){
   <input type="text" id="s_${tid}_${k}" data-som="${tid}" data-field="${k}" value="${esc(val)}" inputmode="decimal" autocomplete="off" ${err?'aria-invalid="true"':""}>
   ${err?`<div class="field-err">${esc(err)}</div>`:""}</div>`;
 }
+function guidePanel(tid){
+  const g=testGuide(tid);const prot=g.tipo==="protetto";
+  return `<div class="banner ${prot?"warn":"info"}"><strong>Perché si usa:</strong> ${esc(g.scopo)}<br>
+    <strong>Prima:</strong> ${esc(g.prima)}<br><strong>Durante:</strong> ${esc(g.durante)}<br>
+    <strong>Dopo:</strong> ${esc(g.dopo)}${g.fonte?`<br><span class="small">Fonte: ${esc(g.fonte)}</span>`:""}</div>`;
+}
+function who5Form(e,assistito){
+  const g=TEST_GUIDES.who5;const opts=[[5,"Sempre"],[4,"La maggior parte del tempo"],[3,"Più della metà del tempo"],[2,"Meno della metà del tempo"],[1,"A volte"],[0,"Mai"]];
+  const score=who5Score(e);
+  return `<div class="${assistito?"assist-card":""}">
+    <h3>${assistito?"Questionario sul benessere":"WHO-5 — compilazione guidata"}</h3>
+    <p>${assistito?"Per ciascuna frase, scegli la risposta che più si avvicina a come ti sei sentito/a nelle ultime due settimane.":"Consegnare il dispositivo alla persona oppure leggere gli item senza modificarli."}</p>
+    ${g.items.map((q,i)=>`<div class="assist-item"><label for="who5_${i}">${i+1}. ${esc(q)}</label>
+      <select id="who5_${i}" data-answer-test="who5" data-answer-index="${i}">
+        <option value="">Scegli una risposta</option>${opts.map(([v,l])=>`<option value="${v}"${e.risposte[i]===v?" selected":""}>${l}</option>`).join("")}
+      </select></div>`).join("")}
+    ${score?`<div class="banner info"><strong>Punteggio registrato: ${score.grezzo}/25</strong> (${score.percentuale}/100). ${score.approfondire?"La fonte OMS consiglia un approfondimento con un questionario diagnostico della depressione; la valutazione spetta al medico.":"Il risultato non genera una diagnosi e va letto nel contesto clinico."}</div>`:"<p class="muted">Completa tutte le risposte per ottenere il punteggio grezzo.</p>"}
+    <p class="muted small">World Health Organization, WHO-5, 2024. Licenza CC BY-NC-SA 3.0 IGO. La traduzione italiana precede l’assegnazione del copyright all’OMS; in caso di difformità prevale l’originale inglese.</p>
+  </div>`;
+}
 function viewProve(){
   const s=cur();
+  const next=guidedNext(s);const assistito=s.modalita==="assistito";
+  if(assistito){
+    const tid=next.test;
+    if(!tid||testGuide(tid).chi!=="assistito")return `<div class="card"><div class="mode-switch"><button data-action="set-mode" data-mode="medico">Torna all’interfaccia del medico</button></div><div class="assist-card"><h3>Attendi il medico</h3><p>La prossima attività richiede la conduzione del professionista. Non sono mostrati materiali clinici o risultati interpretativi.</p></div></div>`;
+    const e=s.somministrazioni[tid]||(s.somministrazioni[tid]=newSomm());
+    return `<div class="card"><div class="mode-switch"><button data-action="set-mode" data-mode="medico">Torna all’interfaccia del medico</button></div>${tid==="who5"?who5Form(e,true):""}</div>`;
+  }
   const packs=state.normPacks||[];
   const cards=(s.batteria||[]).map(tid=>{
     const t=TEST_BY_ID[tid];
@@ -1378,7 +1454,7 @@ function viewProve(){
     const errs=validateSomm(tid,e);
     const stati=[["completato","Completata"],["da-fare","Da fare"],["non-eseguito","Non eseguita"],["non-interpretabile","Non interpretabile"]];
     const sc=e.stato==="completato"?scoreTest(tid,{grezzo:e.grezzo,etaAnni:s.anagrafica.etaAnni,scolaritaAnni:s.anagrafica.scolaritaAnni,sesso:s.anagrafica.sesso},packs):null;
-    const aperto=e.stato!=="da-fare"||Object.keys(errs).length>0;
+    const aperto=e.stato!=="da-fare"||Object.keys(errs).length>0||next.test===tid;
     return `<details class="test-card" id="card_${tid}" ${aperto?"open":""}>
       <summary>
         <span class="nm">${t.nome} <span class="muted">(${t.sigla})</span></span>
@@ -1386,6 +1462,8 @@ function viewProve(){
         ${e.classif!=="na"?`<span class="badge ${e.classif}">${RATING_LABEL[e.classif]}</span>`:""}
       </summary>
       <div class="body">
+        ${guidePanel(tid)}
+        ${tid==="who5"?who5Form(e,false):""}
         <div class="stato-row">
           ${stati.map(([v,l])=>`<button class="mini${e.stato===v?" on":""}" data-action="som-stato" data-id="${tid}" data-val="${v}">${l}</button>`).join("")}
         </div>
@@ -1435,6 +1513,10 @@ function viewProve(){
     <p class="muted small">Per ogni prova: stato, cronometro, punteggio grezzo, tempo, errori,
     autocorrezioni, intrusioni, perseverazioni, punteggio corretto e classificazione del clinico.
     Il grezzo da solo non classifica mai la prestazione.</p>
+    <div class="mode-switch"><button class="on" data-action="set-mode" data-mode="medico">Interfaccia medico</button><button data-action="set-mode" data-mode="assistito">Interfaccia assistito</button></div>
+    <div class="banner info"><strong>${esc(next.titolo)}</strong><br>${esc(next.motivo)}
+      <div class="btnrow"><button class="primary" data-action="guided-next">Apri il prossimo passaggio</button></div></div>
+    <div class="flow" aria-label="Flusso guidato"><div class="node">1. Condizioni e quesito</div><div class="node active">2. Prova indicata</div><div class="node">3. Controllo del risultato</div><div class="node">4. Approfondimento motivato</div></div>
     ${cards||'<p class="muted">La batteria è vuota: tornare al passo 3.</p>'}
     <label for="f_oss">Osservazioni comportamentali durante l'esame</label>
     <textarea id="f_oss" data-bind="osservazioni">${esc(s.osservazioni)}</textarea>
@@ -1737,6 +1819,13 @@ const ACTIONS={
     toast("Batteria di base aggiunta alla selezione: adattarla liberamente.","ok");
   },
   "battery-clear":()=>{const s=cur();s.batteria=[];touchSession();render();},
+  "set-mode":btn=>{const s=cur();s.modalita=btn.dataset.mode==="assistito"?"assistito":"medico";touchSession();render();},
+  "guided-next":()=>{
+    const s=cur();const n=guidedNext(s);
+    if(n.add&&!s.batteria.includes(n.add)){s.batteria.push(n.add);touchSession();toast("Approfondimento aggiunto alla batteria: puoi rimuoverlo se non è appropriato.","ok");}
+    if(n.view==="prove"){render();setTimeout(()=>{const el=$("#card_"+n.test);if(el){el.open=true;el.scrollIntoView({behavior:"smooth",block:"start"});}},0);}
+    else go(n.view);
+  },
   "som-stato":btn=>{
     const s=cur();const e=s.somministrazioni[btn.dataset.id]||(s.somministrazioni[btn.dataset.id]=newSomm());
     e.stato=btn.dataset.val;touchSession();render();
@@ -1836,6 +1925,12 @@ document.addEventListener("input",e=>{
   }else if(el.dataset.som){
     const eSom=s.somministrazioni[el.dataset.som]||(s.somministrazioni[el.dataset.som]=newSomm());
     eSom[el.dataset.field]=el.value;touchSession();
+  }else if(el.dataset.answerTest){
+    const tid=el.dataset.answerTest;const eSom=s.somministrazioni[tid]||(s.somministrazioni[tid]=newSomm());
+    if(el.value==="")delete eSom.risposte[el.dataset.answerIndex];else eSom.risposte[el.dataset.answerIndex]=Number(el.value);
+    const score=tid==="who5"?who5Score(eSom):null;
+    if(score){eSom.grezzo=String(score.grezzo);eSom.corretto=String(score.percentuale);eSom.stato="completato";}
+    touchSession();render();
   }else if(el.dataset.validita){
     s.validita.valori[el.dataset.validita]=Number(el.value)||0;touchSession();
   }else if(el.dataset.override){
