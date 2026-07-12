@@ -107,6 +107,13 @@ punteggio grezzo, corretto, classificazione, tempo ed errori, seguita dalla sint
 Il prospetto `LICENZE.md` separa strumenti aperti, gratuiti, a pagamento e voci generiche,
 con una prima stima dei costi ufficiali verificabili.
 
+## Anteprima dal vivo e strumenti gratuiti (v10)
+
+La modifica del testo del referto aggiorna immediatamente l’anteprima impaginata. ACE-III
+dispone del collegamento diretto alla versione italiana ufficiale gratuita; M-ACE rimanda alla
+pagina ufficiale FRONTIER perché nell’elenco corrente non è presente una traduzione italiana.
+Entrambi mantengono registrazione completa di grezzo, tempo, errori e classificazione.
+
 ## Motore di scoring
 
 Separato dall'interfaccia (`scoreTest`), vuoto per progetto. Le norme si aggiungono

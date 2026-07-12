@@ -191,7 +191,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v9";
+const APPV="v10";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -258,8 +258,8 @@ const TESTS=[
   T("orientamento","OR","Orientamento spazio-tempo-persona","screening","screening",[],{lic:"generico",note:"Prova generica di colloquio, non standardizzata."}),
   T("mmse","MMSE","Mini-Mental State Examination","screening","screening",[],{min:0,max:30,dur:10}),
   T("moca","MoCA","Montreal Cognitive Assessment","screening","screening",[],{min:0,max:30,dur:12}),
-  T("ace3","ACE-III","Addenbrooke's Cognitive Examination III","screening","screening",[],{min:0,max:100,dur:20}),
-  T("miniace","M-ACE","Mini-Addenbrooke's Cognitive Examination","screening","screening",[],{min:0,max:30,dur:6}),
+  T("ace3","ACE-III","Addenbrooke's Cognitive Examination III","screening","screening",[],{min:0,max:100,dur:20,lic:"gratuita-ufficiale",note:"Versione italiana ufficiale disponibile; somministrazione tramite PDF originale."}),
+  T("miniace","M-ACE","Mini-Addenbrooke's Cognitive Examination","screening","screening",[],{min:0,max:30,dur:6,lic:"gratuita-ufficiale",note:"Gratuito per uso non commerciale; non risulta una traduzione italiana ufficiale nell’elenco corrente."}),
   T("fab","FAB","Frontal Assessment Battery","screening","esecutive",["screening"],{min:0,max:18,dur:8}),
   /* attenzione e velocità */
   T("digit-avanti","DS-F","Digit Span avanti","attenzione","attenzione",["mdl"],{dur:5}),
@@ -327,6 +327,8 @@ const TEST_GUIDES={
     prima:"Verificare lingua, udito e possibilità di rispondere.",durante:"Porre domande naturali senza suggerire la risposta; annotare esitazioni e autocorrezioni.",dopo:"Registrare una sintesi qualitativa. Non è una prova standardizzata e non produce una classificazione automatica."},
   mmse:{tipo:"protetto",chi:"medico",scopo:"Screening cognitivo globale.",prima:"Usare esclusivamente il modulo e il manuale originali nella versione autorizzata.",durante:"Seguire alla lettera consegne, tempi e regole del manuale.",dopo:"Inserire qui punteggio e classificazione ricavati dalle norme appropriate. L'app non mostra item né calcola norme."},
   moca:{tipo:"protetto",chi:"medico",scopo:"Screening multidominio, con particolare sensibilità alle difficoltà lievi.",prima:"Accedere al materiale ufficiale; formazione e certificazione possono essere obbligatorie.",durante:"Non modificare consegne o stimoli e non esporre il test in modalità assistito.",dopo:"Registrare il risultato ottenuto secondo la documentazione ufficiale."},
+  ace3:{tipo:"gratuito",chi:"medico",scopo:"Screening cognitivo multidominio con punteggi per attenzione, memoria, fluenza, linguaggio e abilità visuospaziali.",prima:"Aprire o stampare la versione italiana ufficiale e seguire la formazione gratuita raccomandata.",durante:"Somministrare dal documento originale senza modificare item, figure o regole.",dopo:"Registrare totale e punteggi di dominio secondo la guida ufficiale.",fonte:"FRONTIER, University of Sydney",officialUrl:"https://www.sydney.edu.au/content/dam/corporate/documents/brain-and-mind-centre/dementia-resources/italian-ace-iii_rev_2023.pdf"},
+  miniace:{tipo:"gratuito",chi:"medico",scopo:"Screening breve di orientamento, memoria, fluenza animale e disegno dell’orologio.",prima:"Usare soltanto una traduzione ufficiale appropriata alla lingua della persona.",durante:"Seguire il protocollo originale M-ACE.",dopo:"Registrare il totale su 30; l’app non integra soglie automatiche.",fonte:"FRONTIER, University of Sydney",officialUrl:"https://www.sydney.edu.au/brain-mind/our-clinics/dementia-test.html"},
   depressione:{tipo:"aperto",chi:"assistito",scopo:"Rilevare la frequenza di nove gruppi di sintomi depressivi nelle ultime due settimane.",prima:"Spiegare che è uno screening e predisporre la revisione immediata dell’item 9.",durante:"La persona sceglie una frequenza per ogni item senza ricevere interpretazioni automatiche.",dopo:"Somma 0–27. Qualunque risposta diversa da Mai all’item 9 richiede valutazione clinica diretta, indipendentemente dal totale."},
   ansia:{tipo:"aperto",chi:"assistito",scopo:"Rilevare la frequenza di sette sintomi ansiosi nelle ultime due settimane.",prima:"Verificare che la persona comprenda le quattro opzioni di frequenza.",durante:"La persona risponde autonomamente o con lettura neutra degli item.",dopo:"Somma 0–21. Il risultato è uno screening e non una diagnosi."},
   "who5":{tipo:"aperto",chi:"assistito",scopo:"Misurare il benessere mentale riferito nelle ultime due settimane.",
@@ -1477,7 +1479,7 @@ function viewBatteria(){
         <input type="checkbox" id="bt_${t.id}" data-battery="${t.id}" ${sel.has(t.id)?"checked":""} aria-label="Includi ${esc(t.nome)}">
         <div>
           <label for="bt_${t.id}" style="margin:0;display:inline" class="nm">${t.nome} <span class="muted">(${t.sigla})</span></label>
-          <span class="badge lic">${t.licenza==="generico"?"prova generica":(t.licenza==="aperta"?"licenza aperta":"licenza da verificare")}</span>
+          <span class="badge lic">${t.licenza==="generico"?"prova generica":(t.licenza==="aperta"?"licenza aperta":(t.licenza==="gratuita-ufficiale"?"materiale ufficiale gratuito":"licenza da verificare"))}</span>
           <span class="badge lic">${t.soloManuale?"solo punteggi manuali":"compilabile nell’app"}</span>
           <span class="badge lic">${t.normeIntegrate?"norme configurate":"norme non integrate"}</span>
           <div class="muted small">Dominio: ${domName(t.dom)}${t.domSec.length?" (+ "+t.domSec.map(domName).join(", ")+")":""}${t.durataMin?" — ~"+t.durataMin+" min":""}${t.noteCliniche?" — "+esc(t.noteCliniche):""}</div>
@@ -1514,7 +1516,8 @@ function guidePanel(tid){
   const g=testGuide(tid);const prot=g.tipo==="protetto";
   return `<div class="banner ${prot?"warn":"info"}"><strong>Perché si usa:</strong> ${esc(g.scopo)}<br>
     <strong>Prima:</strong> ${esc(g.prima)}<br><strong>Durante:</strong> ${esc(g.durante)}<br>
-    <strong>Dopo:</strong> ${esc(g.dopo)}${g.fonte?`<br><span class="small">Fonte: ${esc(g.fonte)}</span>`:""}</div>`;
+    <strong>Dopo:</strong> ${esc(g.dopo)}${g.fonte?`<br><span class="small">Fonte: ${esc(g.fonte)}</span>`:""}
+    ${g.officialUrl?`<div class="btnrow"><a href="${esc(g.officialUrl)}" target="_blank" rel="noopener"><button type="button">Apri il materiale ufficiale</button></a></div>`:""}</div>`;
 }
 function who5Form(e,assistito){
   const g=TEST_GUIDES.who5;const opts=[[5,"Sempre"],[4,"La maggior parte del tempo"],[3,"Più della metà del tempo"],[2,"Meno della metà del tempo"],[1,"A volte"],[0,"Mai"]];
@@ -1835,7 +1838,7 @@ function viewReferto(){
     <label for="reportText">Testo della bozza</label>
     <textarea id="reportText" data-report-edit spellcheck="false">${esc(testo)}</textarea>
     <h4 style="margin-top:1rem">Anteprima impaginata</h4>
-    <div class="report-preview">${reportFormattedHTML(s,testo)}</div>
+    <div class="report-preview" id="reportPreview">${reportFormattedHTML(s,testo)}</div>
     <div class="btnrow">
       <button data-action="regen-report">Rigenera dai dati</button>
       <button data-action="save-version">Salva come versione (v${versioni.length+1})</button>
@@ -2100,6 +2103,7 @@ document.addEventListener("input",e=>{
     if(it){it[el.dataset.field]=el.value;touchSession();}
   }else if(el.hasAttribute("data-report-edit")){
     s.referto.testoManuale=el.value;s.referto.modificatoAt=nowISO();touchSession();
+    const preview=$("#reportPreview");if(preview)preview.innerHTML=reportFormattedHTML(s,el.value);
   }
 });
 $("#fileImport").addEventListener("change",async e=>{

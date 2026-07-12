@@ -72,7 +72,7 @@ t("catalogo: strumenti protetti manuali; strumenti aperti identificati",()=>{
     eq(x.fonteNormativa,null,x.id+" ha una fonte normativa nel codice");
     if(x.licenza==="aperta"){eq(x.soloManuale,false,x.id+" aperto ma solo manuale");ok(x.digitale,x.id+" aperto ma non digitale");}
     else eq(x.soloManuale,true,x.id+" non è a sola registrazione manuale");
-    ok(["da-verificare","generico","aperta"].includes(x.licenza),"licenza inattesa in "+x.id);
+    ok(["da-verificare","generico","aperta","gratuita-ufficiale"].includes(x.licenza),"licenza inattesa in "+x.id);
   });
   ok(!/cut-?off\s*[:=]\s*\d/i.test(html),"possibile cut-off numerico nel codice");
 });
@@ -522,6 +522,13 @@ t("referto impaginato: tabella punteggi e stampa HTML",()=>{
   ok(/function reportScoresHTML\(/.test(html));
   ok(/<th>Grezzo<\/th><th>Corretto<\/th>/.test(html));
   ok(/printArea"\)\.innerHTML=reportFormattedHTML/.test(html));
+  ok(/reportPreview"\);if\(preview\)preview\.innerHTML=reportFormattedHTML/.test(html));
+});
+t("strumenti gratuiti: ACE-III e M-ACE con fonte ufficiale",()=>{
+  ["ace3","miniace"].forEach(id=>{
+    eq(L.TEST_BY_ID[id].licenza,"gratuita-ufficiale");
+    ok(L.TEST_GUIDES[id].officialUrl.includes("sydney.edu.au"));
+  });
 });
 t("PWA: manifest e service worker coerenti",()=>{
   const man=JSON.parse(fs.readFileSync(path.join(__dirname,"manifest.json"),"utf8"));
