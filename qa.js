@@ -19,8 +19,9 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "newSession","newSomm","validateCode","validateAnagrafica","validateSomm",
   "MSG_NO_NORME","validateNormPack","scoreTest","testsOfDomain","domainProfile","profileHash",
   "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
+  "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
   "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport",
-  "exportPayload","sanitizeSession","migrateV1","parseImport","demoSession","nowISO","uid"];
+  "exportPayload","sanitizeSession","migrateV1","parseImport","demoSession","demoSessions","nowISO","uid"];
 try{
   vm.runInContext(m[1]+"\n;this.__NS={"+EXPORTS.join(",")+"};",ctx,{filename:"index.html <logica>"});
 }catch(e){
@@ -366,6 +367,101 @@ t("sessione demo: dichiaratamente fittizia e coerente col catalogo",()=>{
     eq(Object.keys(L.validateSomm(id,s.somministrazioni[id])).length,0,"dati demo non validi per "+id);
   });
   ok(L.proposeModules(s).length>0,"la demo dovrebbe generare proposte");
+});
+
+/* ---------- confronto longitudinale ---------- */
+function coppiaDemo(){
+  const [prima,dopo]=L.demoSessions();
+  const sessions={[prima.id]:prima,[dopo.id]:dopo};
+  return {prima,dopo,sessions};
+}
+t("comparabili: stesse persone via codice paziente, ordinate per data",()=>{
+  const {prima,dopo,sessions}=coppiaDemo();
+  const c=L.comparableSessions(sessions,dopo);
+  eq(c.length,1);eq(c[0].id,prima.id);
+  const estranea=L.newSession("ALTRO-01");
+  sessions[estranea.id]=estranea;
+  eq(L.comparableSessions(sessions,dopo).length,1,"sessione di altro paziente inclusa nel confronto");
+  eq(L.comparableSessions(sessions,estranea).length,0,"senza codice paziente non deve trovare nulla");
+});
+t("newFollowUp: copia dati stabili e batteria, codice unico, aggancio al confronto",()=>{
+  const {prima,sessions}=coppiaDemo();
+  const f=L.newFollowUp(prima,sessions);
+  eq(f.anagrafica.codicePaziente,"DEMO-PZ");
+  eq(f.anagrafica.scolaritaAnni,prima.anagrafica.scolaritaAnni);
+  eq(f.batteria,prima.batteria);
+  eq(f.confronto.withId,prima.id);
+  ok(f.code!==prima.code&&!Object.values(sessions).some(x=>x.code===f.code),"codice non unico");
+  eq(Object.keys(f.somministrazioni).length,0,"i risultati non vanno copiati");
+  eq(f.referto.conclusioni,"","le conclusioni non vanno copiate");
+});
+t("compareSessions: differenze di grezzo/tempo/errori e classificazioni variate",()=>{
+  const {prima,dopo}=coppiaDemo();
+  const cmp=L.compareSessions(prima,dopo);
+  ok(cmp.giorni>=300&&cmp.giorni<=400,"intervallo inatteso: "+cmp.giorni);
+  const mmse=cmp.tests.find(t=>t.tid==="mmse");
+  eq(mmse.dGrezzo,-2);
+  ok(mmse.classifVariata,"borderline→deficit non rilevato");
+  const tmt=cmp.tests.find(t=>t.tid==="tmt-a");
+  eq(tmt.dTempo,12);
+  eq(tmt.dErrori,1);
+  const dgt=cmp.tests.find(t=>t.tid==="digit-avanti");
+  eq(dgt.dGrezzo,0);ok(!dgt.classifVariata);
+  ok(cmp.tests[0].classifVariata,"le prove con classificazione variata devono venire prima");
+  ok(cmp.soloPrev.includes("copia-disegni"),"prova completata solo nella baseline deve stare in soloPrev");
+  ok(!cmp.tests.some(t=>t.tid==="copia-disegni"),"prova non somministrata al controllo finita tra le confrontabili");
+});
+t("compareSessions: variazioni dei giudizi di dominio (incl. autonomia e umore/comportamento)",()=>{
+  const {prima,dopo}=coppiaDemo();
+  const cmp=L.compareSessions(prima,dopo);
+  const auto=cmp.domini.find(d=>d.dom==="autonomia");
+  ok(auto&&auto.variato,"autonomia borderline→deficit non rilevata");
+  const vel=cmp.domini.find(d=>d.dom==="velocita");
+  ok(vel&&vel.variato&&vel.curr==="borderline");
+});
+t("comparisonText: descrittivo, con limiti (pratica/RCI) e senza dichiarazioni di significatività",()=>{
+  const {prima,dopo}=coppiaDemo();
+  const txt=L.comparisonText(prima,dopo).join("\n");
+  ok(txt.includes("intervallo"),"manca l'intervallo");
+  ok(txt.includes("Classificazione del clinico variata"),"variazione di classificazione non riportata");
+  ok(txt.includes("da valutare clinicamente"));
+  ok(/effetto pratica/.test(txt)&&/RCI/.test(txt),"limiti pratica/RCI assenti");
+  ok(!/significativ[oa] (miglioramento|peggioramento)|peggioramento significativo|miglioramento significativo/i.test(txt),
+    "il testo dichiara significatività");
+});
+t("referto: sezione 10 compilata dal confronto quando disponibile, placeholder altrimenti",()=>{
+  const {prima,dopo,sessions}=coppiaDemo();
+  const r=L.buildReport(dopo,[],sessions);
+  ok(r.includes("Valutazione precedente: "+prima.code),"sezione 10 senza confronto");
+  ok(r.includes("effetto pratica"),"limiti del confronto assenti dal referto");
+  dopo.confronto.nota="Lettura clinica di prova.";
+  ok(L.buildReport(dopo,[],sessions).includes("Lettura clinica di prova."));
+  const r2=L.buildReport(prima,[],sessions);
+  ok(r2.includes("Nessun confronto impostato"),"placeholder assente per la baseline");
+});
+t("sanitize/export: campo confronto e codice paziente sopravvivono al giro",()=>{
+  const {dopo}=coppiaDemo();
+  dopo.confronto.nota="nota";
+  const res=L.parseImport(JSON.stringify(L.exportPayload({[dopo.id]:dopo})));
+  ok(res.ok,res.errore);
+  eq(res.sessions[0].confronto.withId,dopo.confronto.withId);
+  eq(res.sessions[0].confronto.nota,"nota");
+  eq(res.sessions[0].anagrafica.codicePaziente,"DEMO-PZ");
+});
+t("validateAnagrafica: codice paziente con spazi rifiutato, vuoto lecito",()=>{
+  ok(L.validateAnagrafica({codicePaziente:"mario rossi"}).codicePaziente);
+  eq(L.validateAnagrafica({codicePaziente:""}).codicePaziente,undefined);
+  eq(L.validateAnagrafica({codicePaziente:"DEMO-PZ"}).codicePaziente,undefined);
+});
+t("demoSessions: coppia collegata, fittizia e valida",()=>{
+  const {prima,dopo}=coppiaDemo();
+  eq(prima.anagrafica.codicePaziente,"DEMO-PZ");
+  eq(dopo.anagrafica.codicePaziente,"DEMO-PZ");
+  ok(prima.anagrafica.dataValutazione<dopo.anagrafica.dataValutazione);
+  ok(/fittizi|dimostrativ/i.test(dopo.quesito.quesitoClinico));
+  Object.keys(dopo.somministrazioni).forEach(id=>{
+    eq(Object.keys(L.validateSomm(id,dopo.somministrazioni[id])).length,0,"dati demo follow-up non validi per "+id);
+  });
 });
 
 /* ---------- vincoli sull'HTML ---------- */

@@ -172,7 +172,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v3";
+const APPV="v4";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -337,7 +337,7 @@ function newSession(code){
   return {
     id:uid(),code:code||"",createdAt:nowISO(),updatedAt:nowISO(),schema:SCHEMA,
     anagrafica:{dataValutazione:(new Date()).toISOString().slice(0,10),esaminatore:"",
-      etaAnni:"",sesso:"",scolaritaAnni:"",linguaMadre:"",professione:"",lateralita:""},
+      codicePaziente:"",etaAnni:"",sesso:"",scolaritaAnni:"",linguaMadre:"",professione:"",lateralita:""},
     quesito:{quesitoClinico:"",sospettoDiagnostico:"",anamnesi:"",diagnosiNote:"",farmaci:""},
     validita:{valori:{},caregiverPresente:"",note:""},
     batteria:[],
@@ -345,6 +345,7 @@ function newSession(code){
     osservazioni:"",
     profilo:{override:{},confermatoAt:null,basato:""},
     secondLevel:{basato:"",items:[]},
+    confronto:{withId:"",nota:""},
     referto:{conclusioni:"",raccomandazioni:"",followUp:"",limitiExtra:"",
       testoManuale:"",modificatoAt:null,versioni:[]}
   };
@@ -375,6 +376,8 @@ function validateAnagrafica(a){
     else if(a.dataValutazione>(new Date()).toISOString().slice(0,10))
       errs.dataValutazione="La data di valutazione non può essere nel futuro.";
   }
+  if(a.codicePaziente&&a.codicePaziente.trim()&&!CODE_RE.test(a.codicePaziente.trim()))
+    errs.codicePaziente="Codice paziente non valido: stesse regole del codice di valutazione (2–24 caratteri, niente spazi).";
   return errs;
 }
 /* validazione dell'inserimento di una prova; restituisce {campo:messaggio} */
@@ -608,6 +611,101 @@ function mergeSecondLevel(prev,proposals){
   return items;
 }
 
+/* ---------- Confronto longitudinale ----------
+   Confronta valutazioni dello stesso paziente pseudonimizzato
+   (stesso "codice paziente"). Solo descrittivo: nessuna variazione è
+   dichiarata significativa, perché non sono disponibili correzioni per
+   effetto pratica né indici di cambiamento affidabile (RCI). */
+const LIMITI_CONFRONTO=[
+  "Le variazioni numeriche non sono corrette per effetto pratica e non sono valutate con indici di cambiamento affidabile (RCI): nessuna variazione va interpretata come significativa sulla base del solo confronto.",
+  "Il confronto è valido solo se le prove sono state somministrate nella stessa versione e nelle stesse condizioni."
+];
+function pazCode(s){return (s.anagrafica&&s.anagrafica.codicePaziente||"").trim().toLowerCase();}
+function comparableSessions(sessions,s){
+  const mio=pazCode(s);
+  return Object.values(sessions||{})
+    .filter(x=>x.id!==s.id&&((mio&&pazCode(x)===mio)||(s.confronto&&s.confronto.withId===x.id)))
+    .sort((a,b)=>String(b.anagrafica.dataValutazione).localeCompare(String(a.anagrafica.dataValutazione)));
+}
+function numOrNull(v){
+  if(v===""||v==null||String(v).trim()==="")return null;
+  const n=Number(String(v).replace(",","."));
+  return isNaN(n)?null:n;
+}
+function delta(a,b){return (a==null||b==null)?null:Math.round((b-a)*100)/100;}
+function fmtDelta(d){return d==null?"":(d>0?"+":"")+d;}
+function compareSessions(prev,curr){
+  const giorni=(Date.parse(curr.anagrafica.dataValutazione)-Date.parse(prev.anagrafica.dataValutazione))/86400000;
+  const done=s=>new Set((s.batteria||[]).filter(tid=>{
+    const e=s.somministrazioni[tid];return e&&e.stato==="completato";}));
+  const dPrev=done(prev),dCurr=done(curr);
+  const tests=[];
+  dCurr.forEach(tid=>{
+    if(!dPrev.has(tid))return;
+    const a=prev.somministrazioni[tid],b=curr.somministrazioni[tid];
+    tests.push({tid,
+      grezzoPrev:a.grezzo,grezzoCurr:b.grezzo,dGrezzo:delta(numOrNull(a.grezzo),numOrNull(b.grezzo)),
+      tempoPrev:a.tempoSec,tempoCurr:b.tempoSec,dTempo:delta(numOrNull(a.tempoSec),numOrNull(b.tempoSec)),
+      erroriPrev:a.errori,erroriCurr:b.errori,dErrori:delta(numOrNull(a.errori),numOrNull(b.errori)),
+      classifPrev:a.classif,classifCurr:b.classif,
+      classifVariata:a.classif!=="na"&&b.classif!=="na"&&a.classif!==b.classif});
+  });
+  tests.sort((x,y)=>(y.classifVariata?1:0)-(x.classifVariata?1:0));
+  const soloPrev=[...dPrev].filter(tid=>!dCurr.has(tid));
+  const soloCurr=[...dCurr].filter(tid=>!dPrev.has(tid));
+  const pPrev=domainProfile(prev),pCurr=domainProfile(curr);
+  const domini=[];
+  ["screening"].concat(DOMS.map(d=>d.id)).forEach(did=>{
+    const a=pPrev[did],b=pCurr[did];
+    if(!a.inBatteria.length&&!b.inBatteria.length)return;
+    if(a.giudizio==="na"&&b.giudizio==="na")return;
+    domini.push({dom:did,prev:a.giudizio,curr:b.giudizio,variato:a.giudizio!==b.giudizio});
+  });
+  return {giorni:Number.isFinite(giorni)?Math.round(giorni):null,tests,soloPrev,soloCurr,domini,limiti:LIMITI_CONFRONTO};
+}
+function comparisonText(prev,curr){
+  const cmp=compareSessions(prev,curr);
+  const L=[];
+  L.push("Valutazione precedente: "+prev.code+" del "+fmtDateIT(prev.anagrafica.dataValutazione)+
+    (cmp.giorni!=null?" (intervallo: "+cmp.giorni+" giorni)":"")+".");
+  const nomi=tid=>TEST_BY_ID[tid]?TEST_BY_ID[tid].nome:tid;
+  if(!cmp.tests.length)L.push("Nessuna prova completata in entrambe le valutazioni: confronto numerico non possibile.");
+  cmp.tests.forEach(t=>{
+    const parti=[];
+    if(t.grezzoPrev!==""||t.grezzoCurr!=="")parti.push("grezzo "+(t.grezzoPrev||"–")+" → "+(t.grezzoCurr||"–")+(t.dGrezzo!=null?" ("+fmtDelta(t.dGrezzo)+")":""));
+    if(t.tempoPrev!==""||t.tempoCurr!=="")parti.push("tempo "+(fmtSec(t.tempoPrev)||"–")+" → "+(fmtSec(t.tempoCurr)||"–"));
+    if(t.erroriPrev!==""||t.erroriCurr!=="")parti.push("errori "+(t.erroriPrev||"0")+" → "+(t.erroriCurr||"0"));
+    let riga="- "+nomi(t.tid)+": "+parti.join("; ");
+    if(t.classifVariata)riga+=". Classificazione del clinico variata: da "+RATING_LABEL[t.classifPrev]+" a "+RATING_LABEL[t.classifCurr]+" (da valutare clinicamente)";
+    else if(t.classifPrev!=="na")riga+=". Classificazione invariata ("+RATING_LABEL[t.classifCurr]+")";
+    L.push(riga+".");
+  });
+  const domVar=cmp.domini.filter(d=>d.variato);
+  if(domVar.length)L.push("Giudizi di dominio variati: "+domVar.map(d=>domName(d.dom)+" da "+RATING_LABEL[d.prev]+" a "+RATING_LABEL[d.curr]).join("; ")+".");
+  else if(cmp.domini.length)L.push("Giudizi di dominio invariati rispetto alla valutazione precedente.");
+  if(cmp.soloCurr.length)L.push("Prove presenti solo nella valutazione attuale: "+cmp.soloCurr.map(nomi).join("; ")+".");
+  if(cmp.soloPrev.length)L.push("Prove presenti solo nella valutazione precedente: "+cmp.soloPrev.map(nomi).join("; ")+".");
+  cmp.limiti.forEach(x=>L.push("Limite del confronto: "+x));
+  return L;
+}
+/* nuova valutazione di controllo: copia i dati stabili e la batteria */
+function newFollowUp(prev,sessions){
+  const s=newSession("");
+  const paz=(prev.anagrafica.codicePaziente||prev.code).trim();
+  s.anagrafica.codicePaziente=paz;
+  ["etaAnni","sesso","scolaritaAnni","linguaMadre","professione","lateralita"].forEach(k=>{s.anagrafica[k]=prev.anagrafica[k];});
+  s.quesito.quesitoClinico="Valutazione di controllo (follow-up).";
+  s.quesito.diagnosiNote=prev.quesito.diagnosiNote;
+  s.quesito.farmaci=prev.quesito.farmaci;
+  s.batteria=(prev.batteria||[]).slice();
+  s.confronto.withId=prev.id;
+  const esiste=c=>Object.values(sessions||{}).some(x=>x.code.toLowerCase()===c.toLowerCase());
+  let n=2,c;
+  do{c=(paz.slice(0,21)+"-"+n).slice(0,24);n++;}while(esiste(c));
+  s.code=c;
+  return s;
+}
+
 /* ---------- Bozza di referto ---------- */
 function fmtDateIT(iso){
   if(!iso||!/^\d{4}-\d{2}-\d{2}/.test(iso))return iso||"";
@@ -655,7 +753,7 @@ function resultsTable(s,normPacks){
   const w=righe[0].map((_,i)=>Math.max(...righe.map(r=>String(r[i]).length)));
   return righe.map(r=>r.map((c,i)=>String(c).padEnd(w[i])).join("  ").trimEnd()).join("\n");
 }
-function buildReport(s,normPacks){
+function buildReport(s,normPacks,sessions){
   const L=[];const push=t=>L.push(t);
   const p=domainProfile(s);
   const {interferenti,daSegnalare}=validitaInterferenze(s.validita&&s.validita.valori);
@@ -728,7 +826,13 @@ function buildReport(s,normPacks){
   }
   push("");
   push("10. CONFRONTO CON VALUTAZIONI PRECEDENTI");
-  push("Non disponibile in questa versione dell'applicazione: da integrare a cura del clinico.");
+  const prevSess=(sessions&&s.confronto&&s.confronto.withId)?sessions[s.confronto.withId]:null;
+  if(prevSess){
+    comparisonText(prevSess,s).forEach(push);
+    if((s.confronto.nota||"").trim())push("Nota del clinico sul confronto: "+s.confronto.nota.trim());
+  }else{
+    push("Nessun confronto impostato: disponibile quando esiste una valutazione precedente con lo stesso codice paziente.");
+  }
   push("");
   push("11. LIMITI DELLA VALUTAZIONE");
   push("- L'applicazione non integra tabelle normative"+((s.batteria||[]).length?" per le prove somministrate":"")+", salvo fonti importate ed esplicitamente citate: le classificazioni derivano dal giudizio del clinico sulle norme degli strumenti originali.");
@@ -838,6 +942,10 @@ function sanitizeSession(raw){
           strumento:typeof it.strumento==="string"?it.strumento:"",
           note:typeof it.note==="string"?it.note:""}));
   }
+  if(raw.confronto&&typeof raw.confronto==="object"){
+    if(typeof raw.confronto.withId==="string")base.confronto.withId=raw.confronto.withId;
+    if(typeof raw.confronto.nota==="string")base.confronto.nota=raw.confronto.nota;
+  }
   if(raw.referto&&typeof raw.referto==="object"){
     copyStr(base.referto,raw.referto,["conclusioni","raccomandazioni","followUp","limitiExtra","testoManuale"]);
     if(typeof raw.referto.modificatoAt==="string")base.referto.modificatoAt=raw.referto.modificatoAt;
@@ -861,10 +969,12 @@ function parseImport(text){
   return {ok:true,sessions,scartate:obj.sessioni.length-sessions.length};
 }
 
-/* ---------- Sessione dimostrativa (dati interamente fittizi) ---------- */
+/* ---------- Sessioni dimostrative (dati interamente fittizi) ---------- */
 function demoSession(){
   const s=newSession("DEMO-001");
-  s.anagrafica.etaAnni="74";s.anagrafica.sesso="F";s.anagrafica.scolaritaAnni="8";
+  s.anagrafica.codicePaziente="DEMO-PZ";
+  s.anagrafica.dataValutazione=new Date(Date.now()-370*86400000).toISOString().slice(0,10);
+  s.anagrafica.etaAnni="73";s.anagrafica.sesso="F";s.anagrafica.scolaritaAnni="8";
   s.anagrafica.linguaMadre="italiano";s.anagrafica.professione="pensionata (sarta)";s.anagrafica.lateralita="destrimane";
   s.quesito.quesitoClinico="Dati fittizi a scopo dimostrativo: riferite difficoltà di memoria da circa un anno.";
   s.quesito.anamnesi="Esempio dimostrativo, nessun paziente reale.";
@@ -886,6 +996,30 @@ function demoSession(){
   set("iadl",{stato:"completato",grezzo:"5",classif:"borderline",note:"Difficoltà nella gestione dei farmaci riferita dalla figlia."});
   s.osservazioni="Collaborante, consapevole delle difficoltà, lieve ansia da prestazione. (Dati fittizi.)";
   return s;
+}
+/* coppia baseline + follow-up (a ~1 anno) per mostrare il confronto longitudinale */
+function demoSessions(){
+  const prima=demoSession();
+  const dopo=newFollowUp(prima,{});
+  dopo.anagrafica.etaAnni="74";
+  dopo.quesito.quesitoClinico="Dati fittizi a scopo dimostrativo: valutazione di controllo a circa un anno.";
+  dopo.validita.valori={vista:1,udito:1,vigilanza:1,collaborazione:1};
+  const set=(id,vals)=>{dopo.somministrazioni[id]=Object.assign(newSomm(),vals);};
+  set("orientamento",{stato:"completato",classif:"norma"});
+  set("mmse",{stato:"completato",grezzo:"24",classif:"deficit",note:"Perde punti in richiamo e orientamento temporale."});
+  set("digit-avanti",{stato:"completato",grezzo:"5",classif:"norma"});
+  set("digit-indietro",{stato:"completato",grezzo:"3",classif:"norma"});
+  set("tmt-a",{stato:"completato",grezzo:"64",tempoSec:"64",errori:"1",classif:"borderline"});
+  set("lista-appr",{stato:"completato",grezzo:"24",intrusioni:"3",classif:"deficit"});
+  set("lista-diff",{stato:"completato",grezzo:"1",intrusioni:"1",classif:"deficit"});
+  set("lista-ric",{stato:"completato",grezzo:"10",classif:"borderline"});
+  set("fluenza-sem",{stato:"completato",grezzo:"9",classif:"deficit"});
+  /* copia-disegni volutamente non somministrata al controllo: mostra le
+     prove presenti in una sola delle due valutazioni nel confronto */
+  set("adl",{stato:"completato",grezzo:"6",classif:"norma"});
+  set("iadl",{stato:"completato",grezzo:"4",classif:"deficit",note:"Peggiorata la gestione dei farmaci e del denaro (riferito dalla figlia)."});
+  dopo.osservazioni="Collaborante, minore consapevolezza delle difficoltà rispetto alla valutazione precedente. (Dati fittizi.)";
+  return [prima,dopo];
 }
 /*NS-LOGIC-END*/
 
@@ -974,7 +1108,8 @@ const STEPS=[
   {id:"prove",n:4,label:"Primo livello"},
   {id:"profilo",n:5,label:"Profilo"},
   {id:"secondo",n:6,label:"Secondo livello",lv2:true},
-  {id:"referto",n:7,label:"Referto"}
+  {id:"confronto",n:7,label:"Confronto"},
+  {id:"referto",n:8,label:"Referto"}
 ];
 function anyProva(s){return (s.batteria||[]).some(tid=>{
   const e=s.somministrazioni[tid];return e&&e.stato!=="da-fare";});}
@@ -985,6 +1120,7 @@ function stepEnabled(id){
     case "prove":return (s.batteria||[]).length>0;
     case "profilo":return anyProva(s);
     case "secondo":return !!s.profilo.confermatoAt;
+    case "confronto":return comparableSessions(state.sessions,s).length>0;
     case "referto":return true;
     default:return false;
   }
@@ -993,6 +1129,7 @@ function stepDisabledMsg(id){
   if(id==="prove")return "Prima comporre la batteria (passo 3).";
   if(id==="profilo")return "Prima registrare almeno una prova al primo livello.";
   if(id==="secondo")return "Prima confermare il profilo per domini (passo 5).";
+  if(id==="confronto")return "Disponibile quando esiste un'altra valutazione con lo stesso codice paziente (passo 1).";
   return "";
 }
 function renderStepper(){
@@ -1006,6 +1143,7 @@ function renderStepper(){
       const e=s.somministrazioni[tid];return e&&e.stato!=="da-fare";}),
     profilo:!!s.profilo.confermatoAt,
     secondo:(s.secondLevel.items||[]).some(i=>i.incluso&&i.esito!=="na"),
+    confronto:!!(s.confronto&&s.confronto.withId&&state.sessions[s.confronto.withId]),
     referto:!!(s.referto.conclusioni&&s.referto.conclusioni.trim())
   };
   nav.innerHTML=STEPS.map(st=>{
@@ -1026,7 +1164,7 @@ function render(){
   else top.hidden=true;
   renderStepper();
   const views={home:viewHome,sessione:viewSessione,validita:viewValidita,batteria:viewBatteria,
-    prove:viewProve,profilo:viewProfilo,secondo:viewSecondo,referto:viewReferto};
+    prove:viewProve,profilo:viewProfilo,secondo:viewSecondo,confronto:viewConfronto,referto:viewReferto};
   $("#app").innerHTML=(views[currentView]||viewHome)();
 }
 function go(view){
@@ -1053,10 +1191,11 @@ function viewHome(){
     const stato=s.profilo.confermatoAt?"profilo confermato":(fatte?fatte+"/"+n+" prove registrate":(n?"batteria composta":"appena creata"));
     return `<div class="sess-item">
       <div class="grow">
-        <div class="code">${esc(s.code)}</div>
+        <div class="code">${esc(s.code)}${s.anagrafica.codicePaziente?` <span class="badge lic">paziente ${esc(s.anagrafica.codicePaziente)}</span>`:""}</div>
         <div class="info">Valutazione del ${esc(fmtDateIT(s.anagrafica.dataValutazione))} — ${esc(stato)}</div>
       </div>
       <button data-action="open" data-id="${s.id}" class="primary">Apri</button>
+      <button data-action="new-followup" data-id="${s.id}">Controllo</button>
       <button data-action="export-one" data-id="${s.id}">Esporta</button>
       <button data-action="delete" data-id="${s.id}" class="danger">Elimina</button>
     </div>`;
@@ -1119,9 +1258,14 @@ function viewSessione(){
     <h3>Passo 1 — Sessione e quesito clinico</h3>
     <p class="muted small">Solo dati essenziali e non identificativi. Età, scolarità e sesso servono
     al motore di scoring quando è configurata una fonte normativa che li richiede.</p>
-    <label for="f_code">Codice pseudonimo</label>
-    <input type="text" id="f_code" data-bind="code" value="${esc(s.code)}" maxlength="24" autocomplete="off" ${codeErr?'aria-invalid="true"':""}>
-    ${codeErr?`<div class="field-err">${esc(codeErr)}</div>`:""}
+    <div class="grid2">
+      <div><label for="f_code">Codice della valutazione</label>
+      <input type="text" id="f_code" data-bind="code" value="${esc(s.code)}" maxlength="24" autocomplete="off" ${codeErr?'aria-invalid="true"':""}>
+      ${codeErr?`<div class="field-err">${esc(codeErr)}</div>`:""}</div>
+      <div><label for="f_paz">Codice paziente (per il confronto tra valutazioni)</label>
+      <input type="text" id="f_paz" data-bind="anagrafica.codicePaziente" value="${esc(a.codicePaziente)}" maxlength="24" autocomplete="off" placeholder="stesso codice in tutte le valutazioni della persona" ${errs.codicePaziente?'aria-invalid="true"':""}>
+      ${errs.codicePaziente?`<div class="field-err">${esc(errs.codicePaziente)}</div>`:""}</div>
+    </div>
     <div class="grid3">
       ${fld("anagrafica.dataValutazione","Data di valutazione","date",a.dataValutazione,errs.dataValutazione)}
       <div><label for="f_esam">Esaminatore</label>
@@ -1394,13 +1538,67 @@ function viewSecondo(){
       </select>
       <button data-action="add-mod" ${aggiungibili.length?"":"disabled"}>Aggiungi</button>
     </div>
-    ${navRow("profilo","referto","Avanti: referto")}
+    ${navRow("profilo",stepEnabled("confronto")?"confronto":"referto",stepEnabled("confronto")?"Avanti: confronto":"Avanti: referto")}
+  </div>`;
+}
+
+function viewConfronto(){
+  const s=cur();
+  const cands=comparableSessions(state.sessions,s);
+  if(!cands.length)return `<div class="card"><h3>Passo 7 — Confronto longitudinale</h3>
+    <p class="muted">Nessuna altra valutazione con lo stesso codice paziente. Per usare il confronto,
+    assegnare lo stesso "codice paziente" (passo 1) alle valutazioni della stessa persona, oppure
+    creare una valutazione di controllo dall'elenco iniziale.</p>
+    ${navRow("secondo","referto","Avanti: referto")}</div>`;
+  if(!s.confronto.withId||!cands.some(c=>c.id===s.confronto.withId)){
+    s.confronto.withId=cands[0].id;touchSession();
+  }
+  const prev=state.sessions[s.confronto.withId];
+  const cmp=compareSessions(prev,s);
+  const nome=tid=>TEST_BY_ID[tid]?TEST_BY_ID[tid].nome:tid;
+  const cell=(a,b,d)=>`${esc(a||"–")} → ${esc(b||"–")}${d!=null?` <strong>(${fmtDelta(d)})</strong>`:""}`;
+  const rows=cmp.tests.map(t=>`<tr>
+    <td>${nome(t.tid)}</td>
+    <td>${cell(t.grezzoPrev,t.grezzoCurr,t.dGrezzo)}</td>
+    <td>${cell(fmtSec(t.tempoPrev),fmtSec(t.tempoCurr),null)}${t.dTempo!=null?` <strong>(${fmtDelta(t.dTempo)}s)</strong>`:""}</td>
+    <td>${cell(t.erroriPrev,t.erroriCurr,t.dErrori)}</td>
+    <td>${t.classifPrev!=="na"||t.classifCurr!=="na"
+      ?`${RATING_LABEL[t.classifPrev]} → ${RATING_LABEL[t.classifCurr]}${t.classifVariata?' <span class="badge borderline">variata</span>':""}`:""}</td>
+  </tr>`).join("");
+  const domRows=cmp.domini.map(d=>`<tr><td>${domName(d.dom)}</td>
+    <td><span class="badge ${d.prev}">${RATING_LABEL[d.prev]}</span></td>
+    <td><span class="badge ${d.curr}">${RATING_LABEL[d.curr]}</span></td>
+    <td>${d.variato?'<span class="badge borderline">variato</span>':"invariato"}</td></tr>`).join("");
+  return `
+  <div class="card">
+    <h3>Passo 7 — Confronto longitudinale</h3>
+    <p class="muted small">Confronto descrittivo con una valutazione precedente dello stesso
+    paziente pseudonimizzato. Nessuna variazione viene dichiarata significativa.</p>
+    <label for="cmpSel">Valutazione di confronto</label>
+    <select id="cmpSel" data-confronto-sel>
+      ${cands.map(c=>`<option value="${c.id}"${c.id===s.confronto.withId?" selected":""}>${esc(c.code)} — ${esc(fmtDateIT(c.anagrafica.dataValutazione))}</option>`).join("")}
+    </select>
+    <p class="muted small">Intervallo: ${cmp.giorni!=null?cmp.giorni+" giorni":"non calcolabile"}.</p>
+    <h4>Prove confrontabili (completate in entrambe)</h4>
+    ${cmp.tests.length?`<div class="tbl-wrap"><table class="mini">
+      <tr><th>Prova</th><th>Grezzo</th><th>Tempo</th><th>Errori</th><th>Classificazione</th></tr>${rows}
+    </table></div>`:'<p class="muted">Nessuna prova completata in entrambe le valutazioni.</p>'}
+    ${cmp.soloCurr.length?`<p class="muted small">Solo nella valutazione attuale: ${esc(cmp.soloCurr.map(nome).join("; "))}.</p>`:""}
+    ${cmp.soloPrev.length?`<p class="muted small">Solo nella valutazione precedente: ${esc(cmp.soloPrev.map(nome).join("; "))}.</p>`:""}
+    <h4>Giudizi di dominio</h4>
+    ${cmp.domini.length?`<div class="tbl-wrap"><table class="mini">
+      <tr><th>Dominio</th><th>Prima</th><th>Ora</th><th>Variazione</th></tr>${domRows}
+    </table></div>`:'<p class="muted">Nessun giudizio di dominio disponibile in entrambe.</p>'}
+    ${cmp.limiti.map(x=>`<div class="banner warn">${esc(x)}</div>`).join("")}
+    <label for="f_cmpnota">Lettura clinica del confronto (entra nel referto)</label>
+    <textarea id="f_cmpnota" data-bind="confronto.nota">${esc(s.confronto.nota)}</textarea>
+    ${navRow("secondo","referto","Avanti: referto")}
   </div>`;
 }
 
 function viewReferto(){
   const s=cur();
-  const testo=s.referto.testoManuale||buildReport(s,state.normPacks);
+  const testo=s.referto.testoManuale||buildReport(s,state.normPacks,state.sessions);
   const manuale=!!s.referto.testoManuale;
   const versioni=s.referto.versioni||[];
   return `
@@ -1485,12 +1683,23 @@ const ACTIONS={
     toast("Valutazione "+code+" creata.","ok");
   },
   "new-demo":()=>{
-    let s=demoSession();
-    while(Object.values(state.sessions).some(x=>x.code.toLowerCase()===s.code.toLowerCase()))
-      s.code=(s.code.length>20?s.code.slice(0,20):s.code)+"-b";
+    const coppia=demoSessions();
+    coppia.forEach(s=>{
+      while(Object.values(state.sessions).some(x=>x.code.toLowerCase()===s.code.toLowerCase()))
+        s.code=(s.code.length>20?s.code.slice(0,20):s.code)+"-b";
+      state.sessions[s.id]=s;
+    });
+    state.currentId=coppia[1].id;persist();
+    currentView="sessione";render();
+    toast("Create due sessioni dimostrative collegate (baseline e controllo): tutti i dati sono fittizi.","ok");
+  },
+  "new-followup":btn=>{
+    const prev=state.sessions[btn.dataset.id];if(!prev)return;
+    const s=newFollowUp(prev,state.sessions);
+    if(!prev.anagrafica.codicePaziente)prev.anagrafica.codicePaziente=s.anagrafica.codicePaziente;
     state.sessions[s.id]=s;state.currentId=s.id;persist();
     currentView="sessione";render();
-    toast("Sessione dimostrativa creata: tutti i dati sono fittizi.","ok");
+    toast("Valutazione di controllo "+s.code+" creata: batteria e dati stabili copiati da "+prev.code+". Aggiornare età e data.","ok");
   },
   "open":btn=>{state.currentId=btn.dataset.id;persist();currentView="sessione";render();},
   "delete":btn=>{
@@ -1643,6 +1852,8 @@ document.addEventListener("input",e=>{
     s.batteria=TESTS.map(t=>t.id).filter(id=>set.has(id));
     const c=$("#batCount");if(c)c.textContent=s.batteria.length;
     touchSession();
+  }else if(el.hasAttribute("data-confronto-sel")){
+    s.confronto.withId=el.value;touchSession();render();
   }else if(el.dataset.bindItem){
     const it=(s.secondLevel.items||[]).find(i=>i.id===el.dataset.bindItem);
     if(it){it[el.dataset.field]=el.value;touchSession();}
