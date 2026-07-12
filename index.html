@@ -191,7 +191,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v10";
+const APPV="v11";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -1808,10 +1808,18 @@ function reportScoresHTML(s,normPacks){
   }).join("");
   return `<div class="tbl-wrap"><table><thead><tr><th>Prova</th><th>Stato</th><th>Grezzo</th><th>Corretto</th><th>Classificazione</th><th>Tempo</th><th>Errori</th></tr></thead><tbody>${rows||'<tr><td colspan="7">Nessuna prova registrata.</td></tr>'}</tbody></table></div>`;
 }
+function reportNarrativeForLayout(testo){
+  let out=String(testo||"");
+  const start=out.indexOf("2. QUESITO CLINICO");
+  if(start>=0)out=out.slice(start);
+  out=out.replace(/6\. PROVE SOMMINISTRATE E RISULTATI[\s\S]*?(?=7\. RISULTATI PER DOMINIO)/,"");
+  return out.trim();
+}
 function reportFormattedHTML(s,testo){
   return `<div class="report-head"><div><h2>Referto neuropsicologico</h2><strong>Codice: ${esc(s.code)}</strong></div><div>Data: ${esc(fmtDateIT(s.anagrafica.dataValutazione))}<br>Esaminatore: ${esc(s.anagrafica.esaminatore||"________________")}</div></div>
     <h3>Risultati delle prove</h3>${reportScoresHTML(s,state.normPacks)}
-    <h3 style="margin-top:1rem">Sintesi clinica</h3><div class="narrativa">${esc(testo)}</div>`;
+    <h3 style="margin-top:1rem">Sintesi clinica</h3><div class="narrativa">${esc(reportNarrativeForLayout(testo))}</div>
+    <p class="muted small">Bozza da verificare, completare e firmare a cura del professionista.</p>`;
 }
 
 function viewReferto(){

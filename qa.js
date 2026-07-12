@@ -523,6 +523,8 @@ t("referto impaginato: tabella punteggi e stampa HTML",()=>{
   ok(/<th>Grezzo<\/th><th>Corretto<\/th>/.test(html));
   ok(/printArea"\)\.innerHTML=reportFormattedHTML/.test(html));
   ok(/reportPreview"\);if\(preview\)preview\.innerHTML=reportFormattedHTML/.test(html));
+  ok(/function reportNarrativeForLayout\(/.test(html));
+  ok(/6\\\. PROVE SOMMINISTRATE E RISULTATI/.test(html));
 });
 t("strumenti gratuiti: ACE-III e M-ACE con fonte ufficiale",()=>{
   ["ace3","miniace"].forEach(id=>{

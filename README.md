@@ -114,6 +114,12 @@ dispone del collegamento diretto alla versione italiana ufficiale gratuita; M-AC
 pagina ufficiale FRONTIER perché nell’elenco corrente non è presente una traduzione italiana.
 Entrambi mantengono registrazione completa di grezzo, tempo, errori e classificazione.
 
+## Referto senza duplicazioni (v11)
+
+Nell’anteprima e nel PDF i dati identificativi compaiono soltanto nell’intestazione e i risultati
+soltanto nella tabella impaginata. La narrativa mantiene quesito, anamnesi, validità, profilo,
+osservazioni, conclusioni e indicazioni senza ripetere intestazione e punteggi.
+
 ## Motore di scoring
 
 Separato dall'interfaccia (`scoreTest`), vuoto per progetto. Le norme si aggiungono
