@@ -65,4 +65,6 @@ netti:
    passo 7 di confronto descrittivo, sezione 10 del referto; demo con coppia collegata)
 9. referto strutturato (JSON+TXT), versione della prova nel confronto, rifiniture
    tablet del passo 4 — FATTO in v5
-10. hardening privacy/sicurezza oltre la demo — quando si uscirà dal perimetro locale
+10. somministrazione digitale di prove generiche (fluenze, span, cancellazione,
+   orientamento) con stimoli generati — FATTO in v13
+11. hardening privacy/sicurezza oltre la demo — quando si uscirà dal perimetro locale

@@ -25,6 +25,8 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "MSG_NO_NORME","validateNormPack","validateMaterialPack","materialScore","OPEN_MATERIALS","materialForTest","scoreTest","testsOfDomain","domainProfile","profileHash",
   "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
   "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
+  "ADMIN_NOTA","ADMIN_VERSIONE","ADMIN_TESTS","mulberry32","genDigits","spanInit","spanNext",
+  "CANC_TARGET","genCanc","cancResult","ORIENT_DOMANDE","orientResult",
   "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport","buildStructuredReport",
   "exportPayload","sanitizeSession","migrateV1","parseImport","demoSession","demoSessions","nowISO","uid"];
 try{
@@ -584,6 +586,99 @@ t("versioneProva: avvertenza esplicita nel testo del confronto e nel referto",()
   ok(txt.includes("forma A")&&txt.includes("forma B"),"versioni non citate");
   ok(txt.includes("confronto non attendibile"),"mancata qualifica di non attendibilità");
   ok(L.buildReport(dopo,[],sessions).includes("versioni della prova diverse"),"avvertenza assente dal referto");
+});
+
+/* ---------- somministrazione digitale di prove generiche (v13) ---------- */
+t("prove generiche: definite solo per test del catalogo, con consegna e tipo validi",()=>{
+  const tipi=new Set(["fluenza","span","canc","orient"]);
+  Object.keys(L.ADMIN_TESTS).forEach(id=>{
+    ok(L.TEST_BY_ID[id],"test inesistente: "+id);
+    ok(tipi.has(L.ADMIN_TESTS[id].tipo),"tipo sconosciuto per "+id);
+    ok(L.ADMIN_TESTS[id].consegna.length>30,"consegna troppo povera per "+id);
+  });
+  ["fluenza-fon","fluenza-sem","digit-avanti","digit-indietro","cancellazione","orientamento"]
+    .forEach(id=>ok(L.ADMIN_TESTS[id],"manca la somministrazione per "+id));
+  ok(/non standardizzata/.test(L.ADMIN_NOTA),"nota di non standardizzazione assente");
+  eq(L.ADMIN_VERSIONE,"digitale-generica-v1");
+});
+t("prove generiche: nessun contenuto di strumenti protetti (stimoli generati, domande generiche)",()=>{
+  /* le sequenze sono generate, non elencate; l'orientamento usa domande
+     di colloquio generiche; nessun item MMSE/MoCA-specifico */
+  ok(L.ORIENT_DOMANDE.length>=8);
+  ok(!L.ORIENT_DOMANDE.some(q=>/parol[ae].*(ripet|ricord)|pentola|carta|casa|pane|gatto/i.test(q)),
+    "domanda sospetta di derivare da item protetti");
+  ok(L.ORIENT_DOMANDE.every(q=>q.endsWith("?")));
+});
+t("mulberry32: deterministico per seme, diverso tra semi",()=>{
+  const a=L.mulberry32(42),b=L.mulberry32(42),c=L.mulberry32(43);
+  const va=[a(),a(),a()],vb=[b(),b(),b()],vc=[c(),c(),c()];
+  eq(va,vb);
+  ok(JSON.stringify(va)!==JSON.stringify(vc));
+  ok(va.every(x=>x>=0&&x<1));
+});
+t("genDigits: lunghezza, cifre 1–9, mai due cifre uguali adiacenti",()=>{
+  const rnd=L.mulberry32(7);
+  for(const len of [3,5,9]){
+    const s=L.genDigits(len,rnd);
+    eq(s.length,len);
+    ok(s.every(d=>Number.isInteger(d)&&d>=1&&d<=9));
+    for(let i=1;i<s.length;i++)ok(s[i]!==s[i-1],"cifre adiacenti uguali");
+  }
+  const r1=L.genDigits(6,L.mulberry32(99)),r2=L.genDigits(6,L.mulberry32(99));
+  eq(r1,r2,"stesso seme deve dare la stessa sequenza");
+});
+t("span: parte da 3, avanza alla prima riuscita, si ferma a due errori sulla stessa lunghezza",()=>{
+  let st=L.spanInit(123);
+  eq(st.len,3);eq(st.trial,1);eq(st.best,0);ok(!st.done);
+  st=L.spanNext(st,true);            // 3 ok → 4
+  eq(st.len,4);eq(st.best,3);eq(st.trial,1);
+  st=L.spanNext(st,false);           // 4 errore 1 → secondo tentativo
+  eq(st.len,4);eq(st.trial,2);ok(!st.done);
+  const seqPrima=st.seq.join("");
+  st=L.spanNext(st,true);            // 4 ok al secondo → 5
+  eq(st.len,5);eq(st.best,4);
+  ok(st.seq.join("")!==seqPrima||st.seq.length===5,"la sequenza deve cambiare tra i tentativi");
+  st=L.spanNext(st,false);
+  st=L.spanNext(st,false);           // due errori a 5 → stop
+  ok(st.done);eq(st.best,4);
+  eq(st.prove,5,"conteggio sequenze presentate errato");
+});
+t("span: fallimento immediato dà 0; arrivo a 9 chiude la prova",()=>{
+  let st=L.spanInit(5);
+  st=L.spanNext(st,false);st=L.spanNext(st,false);
+  ok(st.done);eq(st.best,0);
+  let s2=L.spanInit(6);
+  for(let i=0;i<7;i++)s2=L.spanNext(s2,true); // 3..9 tutte corrette
+  ok(s2.done);eq(s2.best,9);
+});
+t("cancellazione: griglia deterministica con numero esatto di bersagli e conteggi corretti",()=>{
+  const g=L.genCanc(11);
+  eq(g.righe*g.colonne,g.celle.length);
+  eq(g.celle.filter(c=>c.t).length,g.nBersagli);
+  eq(g.nBersagli,16);
+  ok(g.celle.every(c=>c.t===(c.sym===L.CANC_TARGET)),"simbolo bersaglio incoerente");
+  const g2=L.genCanc(11);
+  eq(g.celle.map(c=>c.sym).join(""),g2.celle.map(c=>c.sym).join(""),"stesso seme deve dare la stessa griglia");
+  /* marca 2 bersagli e 1 distrattore */
+  const marcate={};
+  let presi=0;
+  g.celle.forEach((c,i)=>{if(c.t&&presi<2){marcate[i]=true;presi++;}});
+  const iDis=g.celle.findIndex(c=>!c.t);marcate[iDis]=true;
+  const r=L.cancResult(g,marcate);
+  eq(r.colpiti,2);eq(r.falsiAllarmi,1);eq(r.omissioni,14);eq(r.bersagli,16);
+});
+t("orientamento: conteggio adeguate/non adeguate/saltate",()=>{
+  const r=L.orientResult({0:"ok",1:"ok",2:"ko",5:"salta"});
+  eq(r.adeguate,2);eq(r.nonAdeguate,1);eq(r.valutate,3);
+  eq(r.saltate,L.ORIENT_DOMANDE.length-3);
+  eq(L.orientResult({}).valutate,0);
+});
+t("HTML: pannelli di somministrazione digitale presenti con etichette corrette",()=>{
+  ok(html.includes('data-action="admin-start"'),"manca l'avvio della somministrazione");
+  ["admin-span","admin-count","admin-cell","admin-orient-done","admin-stop","admin-cancel"]
+    .forEach(a=>ok(html.includes('data-action="'+a+'"'),"manca l'azione "+a));
+  ok(html.includes("prova generica somministrabile"),"manca il badge di prova generica");
+  ok(html.includes("Annulla senza registrare"),"manca l'annullamento");
 });
 
 /* ---------- vincoli sull'HTML ---------- */

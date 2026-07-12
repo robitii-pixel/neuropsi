@@ -102,6 +102,17 @@ details.test-card .body{padding:0 .8rem .8rem;border-top:1px solid var(--line)}
 .stato-row{display:flex;gap:.4rem;flex-wrap:wrap;margin:.4rem 0}
 .stato-row button{font-size:.85rem;padding:.45rem .7rem}
 .stato-row button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+/* somministrazione digitale di prove generiche */
+.adm{border:1px dashed var(--brand);border-radius:10px;padding:.7rem;margin:.5rem 0;background:#f7fafd}
+.adm .seq{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:2.1rem;font-weight:700;letter-spacing:.35em;text-align:center;margin:.4rem 0}
+.adm .cd{font-size:1.6rem;font-weight:700;font-family:ui-monospace,Menlo,Consolas,monospace}
+.adm-big{font-size:1.05rem;min-height:56px;padding:.6rem 1.2rem}
+.canc-grid{display:grid;gap:.35rem;margin:.5rem 0}
+.canc-grid button{min-height:48px;font-size:1.3rem;padding:0;line-height:1}
+.canc-grid button.mark{background:var(--warn-bg);border-color:var(--warn)}
+.orient-row{display:flex;gap:.5rem;align-items:center;padding:.3rem 0;border-bottom:1px dashed var(--line);flex-wrap:wrap}
+.orient-row .q{flex:1;min-width:12rem}
+.orient-row button.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .mode-switch{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 1rem}
 .mode-switch button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
 .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin:.7rem 0}
@@ -194,7 +205,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v12";
+const APPV="v13";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -385,6 +396,100 @@ function validitaInterferenze(val){
     else if(x===2)segnala.push(v.label.toLowerCase()+": "+v.opts[2]);
   });
   return {interferenti:inter,daSegnalare:segnala};
+}
+
+/* ---------- Somministrazione digitale di prove GENERICHE ----------
+   Solo paradigmi liberi con stimoli GENERATI dall'app (mai item di
+   strumenti protetti): fluenze verbali, span di cifre con sequenze
+   casuali, cancellazione con griglia generata, colloquio di
+   orientamento con domande generiche di pratica clinica. */
+const ADMIN_NOTA="Somministrazione digitale generica, non standardizzata: il punteggio grezzo non è confrontabile con le norme delle versioni carta-e-matita. Per usare uno strumento normato, somministrare il materiale originale e registrare i punteggi a mano.";
+const ADMIN_VERSIONE="digitale-generica-v1";
+const ADMIN_TESTS={
+  "fluenza-fon":{tipo:"fluenza",durataSec:60,consegna:"Chiedere di dire, in un minuto, più parole possibile che inizino con la lettera concordata (nomi propri e derivati esclusi). Toccare un pulsante per ogni risposta."},
+  "fluenza-sem":{tipo:"fluenza",durataSec:60,consegna:"Chiedere di dire, in un minuto, più elementi possibile della categoria concordata. Toccare un pulsante per ogni risposta."},
+  "digit-avanti":{tipo:"span",dir:"avanti",consegna:"Leggere le cifre alla persona al ritmo di una al secondo; la persona le ripete nello stesso ordine. Due tentativi per lunghezza: si avanza alla prima riuscita, ci si ferma dopo due errori alla stessa lunghezza."},
+  "digit-indietro":{tipo:"span",dir:"indietro",consegna:"Leggere le cifre al ritmo di una al secondo; la persona le ripete in ordine INVERSO. Due tentativi per lunghezza: si avanza alla prima riuscita, ci si ferma dopo due errori alla stessa lunghezza."},
+  "cancellazione":{tipo:"canc",consegna:"Porgere il tablet alla persona: deve toccare TUTTI i triangoli, il più velocemente possibile, senza toccare le altre figure. Premere Termina quando ha finito."},
+  "orientamento":{tipo:"orient",consegna:"Porre le domande in modo naturale, senza suggerire. Segnare ogni risposta come adeguata o non adeguata; usare Salta se la domanda non è applicabile."}
+};
+/* generatore deterministico: con lo stesso seme produce la stessa serie */
+function mulberry32(seed){
+  let a=seed>>>0;
+  return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);
+    t=(t+Math.imul(t^(t>>>7),61|t))^t;return ((t^(t>>>14))>>>0)/4294967296;};
+}
+function genDigits(len,rnd){
+  const out=[];
+  while(out.length<len){
+    const d=1+Math.floor(rnd()*9);
+    if(out.length&&out[out.length-1]===d)continue;
+    out.push(d);
+  }
+  return out;
+}
+/* macchina a stati dello span: due tentativi per lunghezza (3→9),
+   avanza alla prima riuscita, si ferma dopo due errori alla stessa
+   lunghezza; il grezzo è la lunghezza massima riuscita (0 se nessuna) */
+function spanInit(seed){
+  const rnd=mulberry32(seed);
+  return {seed,len:3,trial:1,fails:0,best:0,done:false,prove:0,seq:genDigits(3,rnd),_next:rnd};
+}
+function spanNext(st,corretta){
+  const s={seed:st.seed,len:st.len,trial:st.trial,fails:st.fails,best:st.best,done:st.done,prove:st.prove+1,seq:st.seq,_next:st._next};
+  if(s.done)return s;
+  if(corretta){
+    s.best=Math.max(s.best,s.len);
+    if(s.len>=9){s.done=true;return s;}
+    s.len++;s.trial=1;s.fails=0;
+  }else{
+    s.fails++;
+    if(s.fails>=2){s.done=true;return s;}
+    s.trial++;
+  }
+  s.seq=genDigits(s.len,s._next);
+  return s;
+}
+/* cancellazione: griglia generata con numero fisso di bersagli */
+const CANC_TARGET="▲";
+const CANC_DISTRACTORS=["■","●","◆","✚"];
+function genCanc(seed,righe,colonne,nBersagli){
+  righe=righe||6;colonne=colonne||8;nBersagli=nBersagli==null?16:nBersagli;
+  const rnd=mulberry32(seed);
+  const n=righe*colonne;
+  const celle=[];
+  for(let i=0;i<n;i++)celle.push({sym:CANC_DISTRACTORS[Math.floor(rnd()*CANC_DISTRACTORS.length)],t:false});
+  let posti=0;
+  while(posti<nBersagli){
+    const i=Math.floor(rnd()*n);
+    if(celle[i].t)continue;
+    celle[i]={sym:CANC_TARGET,t:true};posti++;
+  }
+  return {righe,colonne,celle,nBersagli};
+}
+function cancResult(grid,marcate){
+  let colpiti=0,falsi=0;
+  grid.celle.forEach((c,i)=>{
+    if(!marcate[i])return;
+    if(c.t)colpiti++;else falsi++;
+  });
+  return {bersagli:grid.nBersagli,colpiti,omissioni:grid.nBersagli-colpiti,falsiAllarmi:falsi};
+}
+/* colloquio di orientamento: domande generiche della pratica clinica,
+   formulazione propria dell'app (nessun item di test protetti) */
+const ORIENT_DOMANDE=[
+  "In che anno siamo?","In che mese siamo?","Che giorno della settimana è oggi?",
+  "In che momento della giornata siamo (mattina, pomeriggio, sera)?",
+  "In che città ci troviamo?","In che luogo ci troviamo (studio, ambulatorio, ospedale)?",
+  "Qual è la sua data di nascita?","Quanti anni ha?","Per quale motivo è qui oggi?"
+];
+function orientResult(risposte){
+  let ok=0,ko=0,salt=0;
+  ORIENT_DOMANDE.forEach((_,i)=>{
+    const v=risposte[i];
+    if(v==="ok")ok++;else if(v==="ko")ko++;else salt++;
+  });
+  return {adeguate:ok,nonAdeguate:ko,saltate:salt,valutate:ok+ko};
 }
 
 /* ---------- Modello dati (schema 2) ---------- */
@@ -1608,6 +1713,84 @@ function materialForm(pack,e,assistito){
     ${!assistito&&sc?`<div class="banner info">Completati ${sc.completi}/${pack.items.length} item${sc.completo?`. Punteggio grezzo calcolato: ${sc.totale}.`:"."} Nessuna interpretazione automatica.</div>`:""}
     <p class="muted small">Materiale importato localmente — fonte: ${esc(pack.fonte)}; licenza: ${esc(pack.licenza.riferimento)}.</p></div>`;
 }
+
+/* ---------- Pannelli di somministrazione digitale (prove generiche) ----------
+   Stato transitorio in memoria: i risultati vengono scritti nella
+   somministrazione solo alla conclusione, con versione della prova
+   "digitale-generica-v1" e nota automatica. */
+const adminState={};
+function admRemaining(st){return Math.max(0,Math.ceil((st.endTs-Date.now())/1000));}
+function adminPanel(tid,e){
+  const cfg=ADMIN_TESTS[tid];
+  if(!cfg)return "";
+  const st=adminState[tid];
+  if(!st){
+    return `<div class="adm">
+      <p style="margin-top:0"><span class="badge lv2b">prova generica somministrabile</span></p>
+      <p class="muted small">${esc(cfg.consegna)}</p>
+      <p class="muted small">${esc(ADMIN_NOTA)}</p>
+      <button data-action="admin-start" data-id="${tid}" class="adm-big">Avvia la somministrazione digitale</button>
+    </div>`;
+  }
+  let corpo="";
+  if(cfg.tipo==="fluenza"){
+    corpo=`<div class="btnrow" style="margin-top:0">
+      <span class="cd" id="adm_cd_${tid}">${admRemaining(st)}″</span>
+      <span class="spacer"></span>
+      <span class="muted">valide <strong id="adm_v_${tid}">${st.counts.v}</strong> ·
+        intrusioni <strong id="adm_i_${tid}">${st.counts.i}</strong> ·
+        perseverazioni <strong id="adm_p_${tid}">${st.counts.p}</strong></span>
+    </div>
+    <div class="btnrow">
+      <button class="adm-big primary" data-action="admin-count" data-id="${tid}" data-kind="v">Parola valida</button>
+      <button class="adm-big" data-action="admin-count" data-id="${tid}" data-kind="i">Intrusione</button>
+      <button class="adm-big" data-action="admin-count" data-id="${tid}" data-kind="p">Perseverazione</button>
+    </div>`;
+  }else if(cfg.tipo==="span"){
+    const attesa=cfg.dir==="indietro"?`<p class="muted small" style="text-align:center">Risposta attesa (ordine inverso): ${st.seq.slice().reverse().join(" ")}</p>`:"";
+    corpo=`<p class="muted small" style="margin-top:0">Lunghezza ${st.len} — tentativo ${st.trial} di 2 — sequenze presentate: ${st.prove}</p>
+    <div class="seq">${st.seq.join(" ")}</div>
+    ${attesa}
+    <div class="btnrow">
+      <button class="adm-big primary" data-action="admin-span" data-id="${tid}" data-val="ok">Risposta corretta</button>
+      <button class="adm-big" data-action="admin-span" data-id="${tid}" data-val="ko">Risposta errata</button>
+    </div>`;
+  }else if(cfg.tipo==="canc"){
+    const g=st.grid;
+    corpo=`<p class="muted small" style="margin-top:0">Bersaglio: <strong style="font-size:1.3rem">${CANC_TARGET}</strong> — toccare tutti i bersagli, poi premere Termina.</p>
+    <div class="canc-grid" style="grid-template-columns:repeat(${g.colonne},1fr)">
+      ${g.celle.map((c,i)=>`<button data-action="admin-cell" data-id="${tid}" data-i="${i}" class="${st.marcate[i]?"mark":""}" aria-pressed="${!!st.marcate[i]}">${c.sym}</button>`).join("")}
+    </div>`;
+  }else if(cfg.tipo==="orient"){
+    corpo=ORIENT_DOMANDE.map((q,i)=>{
+      const v=st.risposte[i]||"";
+      return `<div class="orient-row"><span class="q">${q}</span>
+        <button class="mini${v==="ok"?" on":""}" data-action="admin-orient" data-id="${tid}" data-i="${i}" data-val="ok">Adeguata</button>
+        <button class="mini${v==="ko"?" on":""}" data-action="admin-orient" data-id="${tid}" data-i="${i}" data-val="ko">Non adeguata</button>
+        <button class="mini${v==="salta"?" on":""}" data-action="admin-orient" data-id="${tid}" data-i="${i}" data-val="salta">Salta</button>
+      </div>`;
+    }).join("");
+  }
+  const concludi=(cfg.tipo==="fluenza"||cfg.tipo==="canc")?`<button class="mini" data-action="admin-stop" data-id="${tid}">Termina e registra</button>`
+    :(cfg.tipo==="orient"?`<button class="mini primary" data-action="admin-orient-done" data-id="${tid}">Concludi e registra</button>`:"");
+  return `<div class="adm">${corpo}
+    <div class="btnrow">${concludi}<span class="spacer"></span>
+      <button class="mini danger" data-action="admin-cancel" data-id="${tid}">Annulla senza registrare</button></div>
+  </div>`;
+}
+function adminFinish(tid,campi,nota){
+  const s=cur();if(!s)return;
+  const e=s.somministrazioni[tid]||(s.somministrazioni[tid]=newSomm());
+  Object.keys(campi).forEach(k=>{e[k]=String(campi[k]);});
+  e.stato="completato";
+  e.versioneProva=ADMIN_VERSIONE;
+  e.note=(e.note&&e.note.trim()?e.note.trim()+" ":"")+nota;
+  const st=adminState[tid];
+  if(st&&st.int)clearInterval(st.int);
+  delete adminState[tid];
+  touchSession();persist();render();
+  toast("Prova registrata dalla somministrazione digitale. Classificazione e interpretazione restano al clinico.","ok");
+}
 function viewProve(){
   const s=cur();
   const next=guidedNext(s);const assistito=s.modalita==="assistito";
@@ -1627,7 +1810,7 @@ function viewProve(){
     const errs=validateSomm(tid,e);
     const stati=[["completato","Completata"],["da-fare","Da fare"],["non-eseguito","Non eseguita"],["non-interpretabile","Non interpretabile"]];
     const sc=e.stato==="completato"?scoreTest(tid,{grezzo:e.grezzo,etaAnni:s.anagrafica.etaAnni,scolaritaAnni:s.anagrafica.scolaritaAnni,sesso:s.anagrafica.sesso},packs):null;
-    const aperto=e.stato!=="da-fare"||Object.keys(errs).length>0||next.test===tid;
+    const aperto=e.stato!=="da-fare"||Object.keys(errs).length>0||next.test===tid||!!adminState[tid];
     return `<details class="test-card" id="card_${tid}" ${aperto?"open":""}>
       <summary>
         <span class="nm">${t.nome} <span class="muted">(${t.sigla})</span></span>
@@ -1636,6 +1819,7 @@ function viewProve(){
       </summary>
       <div class="body">
         ${guidePanel(tid)}
+        ${adminPanel(tid,e)}
         ${materialPack?materialForm(materialPack,e,false):(tid==="who5"?who5Form(e,false):"")}
         <div class="stato-row">
           ${stati.map(([v,l])=>`<button class="mini${e.stato===v?" on":""}" data-action="som-stato" data-id="${tid}" data-val="${v}">${l}</button>`).join("")}
@@ -2151,7 +2335,84 @@ const ACTIONS={
       "referto-strutturato-"+s.code+"-"+s.anagrafica.dataValutazione+".json");
   },
   "cards-open":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=true;});},
-  "cards-close":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=false;});}
+  "cards-close":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=false;});},
+  /* --- somministrazione digitale di prove generiche --- */
+  "admin-start":btn=>{
+    const tid=btn.dataset.id;const cfg=ADMIN_TESTS[tid];if(!cfg)return;
+    const s=cur();const e=s.somministrazioni[tid];
+    if(e&&e.stato==="completato"&&!confirm("La prova risulta già completata: una nuova somministrazione digitale sovrascriverà punteggio, tempo ed errori. Continuare?"))return;
+    const seed=(Date.now()^Math.floor(Math.random()*0xffffffff))>>>0;
+    if(cfg.tipo==="fluenza"){
+      const st={tipo:"fluenza",counts:{v:0,i:0,p:0},durata:cfg.durataSec,endTs:Date.now()+cfg.durataSec*1000,int:null};
+      st.int=setInterval(()=>{
+        const r=admRemaining(st);
+        const el=document.getElementById("adm_cd_"+tid);
+        if(el)el.textContent=r+"″";
+        if(r<=0)ACTIONS["admin-stop"]({dataset:{id:tid}});
+      },250);
+      adminState[tid]=st;
+    }else if(cfg.tipo==="span"){
+      adminState[tid]=spanInit(seed);adminState[tid].tipo="span";
+    }else if(cfg.tipo==="canc"){
+      adminState[tid]={tipo:"canc",grid:genCanc(seed),marcate:{},startTs:Date.now()};
+    }else if(cfg.tipo==="orient"){
+      adminState[tid]={tipo:"orient",risposte:{}};
+    }
+    render();
+  },
+  "admin-cancel":btn=>{
+    const st=adminState[btn.dataset.id];
+    if(st&&st.int)clearInterval(st.int);
+    delete adminState[btn.dataset.id];render();
+  },
+  "admin-count":btn=>{
+    const st=adminState[btn.dataset.id];if(!st||st.tipo!=="fluenza")return;
+    if(admRemaining(st)<=0)return;
+    st.counts[btn.dataset.kind]++;
+    const el=document.getElementById("adm_"+btn.dataset.kind+"_"+btn.dataset.id);
+    if(el)el.textContent=st.counts[btn.dataset.kind];
+  },
+  "admin-span":btn=>{
+    const tid=btn.dataset.id;const st=adminState[tid];if(!st||st.tipo!=="span")return;
+    const nuovo=spanNext(st,btn.dataset.val==="ok");nuovo.tipo="span";
+    if(nuovo.done){
+      const dir=ADMIN_TESTS[tid].dir;
+      adminFinish(tid,{grezzo:nuovo.best},
+        "Span "+dir+" in somministrazione digitale generica: lunghezza massima "+nuovo.best+" su "+nuovo.prove+" sequenze presentate.");
+    }else{adminState[tid]=nuovo;render();}
+  },
+  "admin-cell":btn=>{
+    const st=adminState[btn.dataset.id];if(!st||st.tipo!=="canc")return;
+    const i=Number(btn.dataset.i);
+    st.marcate[i]=!st.marcate[i];
+    btn.classList.toggle("mark",!!st.marcate[i]);
+    btn.setAttribute("aria-pressed",String(!!st.marcate[i]));
+  },
+  "admin-stop":btn=>{
+    const tid=btn.dataset.id;const st=adminState[tid];if(!st)return;
+    if(st.tipo==="fluenza"){
+      if(st.int)clearInterval(st.int);
+      const trascorsi=Math.min(st.durata,st.durata-admRemaining(st));
+      adminFinish(tid,{grezzo:st.counts.v,intrusioni:st.counts.i,perseverazioni:st.counts.p,tempoSec:trascorsi},
+        "Fluenza in somministrazione digitale generica ("+trascorsi+"s): "+st.counts.v+" risposte valide, "+st.counts.i+" intrusioni, "+st.counts.p+" perseverazioni.");
+    }else if(st.tipo==="canc"){
+      const r=cancResult(st.grid,st.marcate);
+      const trascorsi=Math.round((Date.now()-st.startTs)/1000);
+      adminFinish(tid,{grezzo:r.colpiti,errori:r.falsiAllarmi,tempoSec:trascorsi},
+        "Cancellazione in somministrazione digitale generica: "+r.colpiti+"/"+r.bersagli+" bersagli, "+r.omissioni+" omissioni, "+r.falsiAllarmi+" falsi allarmi in "+trascorsi+"s.");
+    }
+  },
+  "admin-orient":btn=>{
+    const st=adminState[btn.dataset.id];if(!st||st.tipo!=="orient")return;
+    st.risposte[Number(btn.dataset.i)]=btn.dataset.val;render();
+  },
+  "admin-orient-done":btn=>{
+    const tid=btn.dataset.id;const st=adminState[tid];if(!st||st.tipo!=="orient")return;
+    const r=orientResult(st.risposte);
+    if(!r.valutate){toast("Segnare almeno una risposta prima di concludere.","error");return;}
+    adminFinish(tid,{grezzo:r.adeguate},
+      "Colloquio di orientamento (domande generiche): "+r.adeguate+" risposte adeguate e "+r.nonAdeguate+" non adeguate su "+r.valutate+" valutate"+(r.saltate?" ("+r.saltate+" saltate)":"")+".");
+  }
 };
 
 document.addEventListener("click",e=>{
