@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="NeuroScreen Clinico — prototipo locale di valutazione neuropsicologica guidata. Nessun dato lascia questo dispositivo.">
+<title>NeuroScreen Clinico — prototipo</title>
+<style>
+:root{
+  --bg:#f5f7f9; --card:#ffffff; --ink:#1a2530; --muted:#4a5a68; --line:#d5dde3;
+  --brand:#0b5cad; --brand-ink:#ffffff; --ok:#1e7a3c; --warn:#8a5a00; --bad:#b02a2a;
+  --ok-bg:#e3f2e8; --warn-bg:#fdf3dd; --bad-bg:#fbe5e5; --na-bg:#eef1f4;
+  --focus:#0b5cad;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.5}
+h1,h2,h3{line-height:1.25;margin:0 0 .5rem}
+h1{font-size:1.15rem} h2{font-size:1.3rem} h3{font-size:1.05rem}
+p{margin:.35rem 0}
+a{color:var(--brand)}
+.topbar{background:var(--brand);color:var(--brand-ink);padding:.6rem 1rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.topbar .ver{font-size:.8rem;opacity:.85;border:1px solid rgba(255,255,255,.5);border-radius:999px;padding:.05rem .5rem}
+.topbar .sess{margin-left:auto;font-size:.9rem;background:rgba(255,255,255,.15);border-radius:8px;padding:.2rem .6rem;max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+main{max-width:900px;margin:0 auto;padding:1rem 1rem 5rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem;margin:0 0 1rem}
+.card h3{margin-top:0}
+.muted{color:var(--muted)} .small{font-size:.85rem}
+.banner{border-radius:10px;padding:.6rem .8rem;margin:0 0 1rem;border:1px solid}
+.banner.info{background:#e7f0fa;border-color:#b3cde8;color:#0b3d6b}
+.banner.warn{background:var(--warn-bg);border-color:#e2c27a;color:#5c3d00}
+.banner.error{background:var(--bad-bg);border-color:#e3a3a3;color:#7a1d1d}
+/* stepper */
+.stepper{max-width:900px;margin:0 auto;padding:.75rem 1rem 0;display:flex;gap:.5rem;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.step{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:.55rem .9rem;font-size:.9rem;color:var(--muted);cursor:pointer;min-height:44px;display:flex;align-items:center;gap:.45rem;white-space:nowrap}
+.step .n{display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--na-bg);font-weight:600;font-size:.8rem}
+.step.active{border-color:var(--brand);color:var(--brand);font-weight:600}
+.step.active .n{background:var(--brand);color:#fff}
+.step.done .n{background:var(--ok);color:#fff}
+.step[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+/* form */
+label{display:block;font-weight:600;font-size:.9rem;margin:.6rem 0 .2rem}
+input[type=text],input[type=number],input[type=date],select,textarea{
+  width:100%;font-size:16px;padding:.55rem .6rem;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font-family:inherit}
+textarea{min-height:4.5rem;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus{outline:3px solid rgba(11,92,173,.35);outline-offset:1px}
+.field-err{color:var(--bad);font-size:.85rem;margin:.15rem 0 0}
+input[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--bad)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 1rem}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+/* buttons */
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:.6rem 1rem;min-height:44px}
+button.primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+button.danger{color:var(--bad);border-color:#e3a3a3}
+button:disabled{opacity:.5;cursor:not-allowed}
+.btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+.btnrow .spacer{flex:1}
+/* sessions */
+.sess-item{display:flex;align-items:center;gap:.75rem;padding:.7rem 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.sess-item:last-child{border-bottom:0}
+.sess-item .code{font-weight:700;font-size:1.05rem}
+.sess-item .info{color:var(--muted);font-size:.85rem}
+.sess-item .grow{flex:1;min-width:10rem}
+/* domain rating */
+.dom-card{border:1px solid var(--line);border-radius:10px;padding:.75rem;margin:0 0 .75rem}
+.dom-head{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+.dom-head h4{margin:0;font-size:1rem}
+.ratings{display:flex;gap:.4rem;flex-wrap:wrap;margin:.5rem 0}
+.rate{border:1px solid var(--line);border-radius:8px;padding:.5rem .7rem;min-height:44px;font-size:.9rem;background:#fff}
+.rate.sel-na{background:var(--na-bg);border-color:#9aa7b1;font-weight:600}
+.rate.sel-norma{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);font-weight:600}
+.rate.sel-borderline{background:var(--warn-bg);border-color:var(--warn);color:var(--warn);font-weight:600}
+.rate.sel-deficit{background:var(--bad-bg);border-color:var(--bad);color:var(--bad);font-weight:600}
+.dom-extra{display:grid;grid-template-columns:1fr 1fr;gap:0 .75rem}
+@media(max-width:640px){.dom-extra{grid-template-columns:1fr}}
+details.dom-more summary{cursor:pointer;color:var(--brand);font-size:.9rem;min-height:44px;display:flex;align-items:center}
+/* badges */
+.badge{display:inline-block;border-radius:999px;padding:.1rem .6rem;font-size:.8rem;font-weight:600;border:1px solid}
+.badge.deficit{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.badge.borderline{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.badge.norma{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.badge.na{background:var(--na-bg);color:var(--muted);border-color:#9aa7b1}
+.badge.prio-alta{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.badge.prio-media{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+/* modules */
+.mod-item{display:flex;gap:.7rem;padding:.7rem 0;border-bottom:1px solid var(--line)}
+.mod-item:last-child{border-bottom:0}
+.mod-item input[type=checkbox]{width:1.4rem;height:1.4rem;margin-top:.2rem;flex:0 0 auto}
+.mod-item .body{flex:1}
+.mod-reasons{color:var(--muted);font-size:.85rem;margin:.15rem 0 0}
+/* report */
+#reportText{min-height:22rem;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem;line-height:1.45}
+/* footer */
+.disclaimer{max-width:900px;margin:0 auto;padding:0 1rem 2rem;color:var(--muted);font-size:.8rem}
+/* toasts */
+#toasts{position:fixed;left:50%;bottom:1rem;transform:translateX(-50%);display:flex;flex-direction:column;gap:.5rem;z-index:50;width:min(92vw,26rem)}
+.toast{border-radius:10px;padding:.6rem .9rem;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:.92rem;background:#243240;color:#fff}
+.toast.error{background:#7a1d1d}.toast.ok{background:#1e5c34}
+/* print: si stampa SOLO il referto */
+.print-only{display:none}
+@media print{
+  body{background:#fff}
+  .no-print,.topbar,.stepper,main,.disclaimer,#toasts{display:none !important}
+  .print-only{display:block;white-space:pre-wrap;font:12pt/1.4 Georgia,serif;color:#000;padding:0}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar no-print">
+  <h1>NeuroScreen Clinico</h1>
+  <span class="ver" id="appver"></span>
+  <span class="sess" id="topSess" hidden></span>
+</header>
+
+<nav class="stepper no-print" id="stepper" aria-label="Percorso clinico"></nav>
+
+<main id="app"></main>
+
+<footer class="disclaimer no-print">
+  <p><strong>Prototipo a uso locale.</strong> Questa applicazione non contiene test neuropsicologici
+  standardizzati né tabelle normative e non produce diagnosi: registra il percorso valutativo e
+  genera una bozza di referto che resta interamente sotto la responsabilità del clinico.
+  Tutti i dati sono salvati solo su questo dispositivo (localStorage del browser).
+  Non inserire nome, cognome, data di nascita o altri dati identificativi del paziente:
+  usare esclusivamente il codice pseudonimo.</p>
+</footer>
+
+<div id="toasts" aria-live="polite"></div>
+<div id="printArea" class="print-only"></div>
+<input type="file" id="fileImport" accept=".json,application/json" hidden>
+
+<script>
+"use strict";
+/* ================================================================
+   NeuroScreen Clinico — prototipo locale, senza backend.
+   Blocco LOGICA PURA (nessun accesso al DOM): estratto ed eseguito
+   anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
+   ================================================================ */
+/*NS-LOGIC-START*/
+const APPV="v1";
+const LS_KEY="neuroscreen_v1";
+const RATINGS=[
+  {id:"na",label:"Non valutato"},
+  {id:"norma",label:"Nella norma"},
+  {id:"borderline",label:"Borderline"},
+  {id:"deficit",label:"Deficit"}
+];
+const RATING_LABEL={na:"non valutato",norma:"nella norma",borderline:"borderline",deficit:"deficit"};
+
+const DOMAINS=[
+  {id:"orientamento",nome:"Orientamento",desc:"Orientamento temporale, spaziale e personale."},
+  {id:"attenzione",nome:"Attenzione e velocità",desc:"Attenzione selettiva e sostenuta, velocità di elaborazione."},
+  {id:"memoria",nome:"Memoria episodica",desc:"Apprendimento e rievocazione di materiale nuovo, verbale e non."},
+  {id:"linguaggio",nome:"Linguaggio",desc:"Produzione, comprensione, denominazione, fluenza."},
+  {id:"esecutive",nome:"Funzioni esecutive",desc:"Pianificazione, flessibilità, inibizione, astrazione."},
+  {id:"visuospaziale",nome:"Abilità visuo-spaziali",desc:"Percezione, esplorazione e costruzione visuo-spaziale."},
+  {id:"prassie",nome:"Prassie",desc:"Programmazione ed esecuzione di gesti finalizzati."},
+  {id:"comportamento",nome:"Comportamento e umore",desc:"Osservazione clinica: tono dell'umore, ansia, consapevolezza, collaborazione."}
+];
+const DOMAIN_BY_ID=Object.fromEntries(DOMAINS.map(d=>[d.id,d]));
+
+/* Catalogo dei moduli di approfondimento (secondo livello).
+   Sono aree di indagine descrittive: la scelta dello strumento
+   concreto (test validato) resta al clinico. */
+const MODULES=[
+  {id:"mem-verbale",nome:"Memoria episodica verbale",dom:["memoria"],desc:"Apprendimento di materiale verbale, rievocazione immediata e differita, riconoscimento."},
+  {id:"mem-visiva",nome:"Memoria episodica visuo-spaziale",dom:["memoria","visuospaziale"],desc:"Apprendimento e rievocazione di materiale visivo e di posizioni spaziali."},
+  {id:"mem-lavoro",nome:"Memoria di lavoro",dom:["attenzione","esecutive"],desc:"Mantenimento e manipolazione attiva dell'informazione (span diretti e inversi)."},
+  {id:"att-selettiva",nome:"Attenzione selettiva e sostenuta",dom:["attenzione"],desc:"Ricerca visiva, vigilanza, resistenza alla distrazione, velocità psicomotoria."},
+  {id:"esec-pianificazione",nome:"Pianificazione e flessibilità",dom:["esecutive"],desc:"Organizzazione di sequenze d'azione, shifting, categorizzazione e astrazione."},
+  {id:"esec-inibizione",nome:"Controllo inibitorio",dom:["esecutive","attenzione"],desc:"Soppressione di risposte automatiche e controllo dell'interferenza."},
+  {id:"fluenze",nome:"Fluenze verbali",dom:["linguaggio","esecutive"],desc:"Accesso lessicale su criterio fonemico e semantico."},
+  {id:"ling-denominazione",nome:"Denominazione e comprensione",dom:["linguaggio"],desc:"Denominazione su presentazione visiva, comprensione lessicale e di frasi."},
+  {id:"visuo-costruttive",nome:"Abilità visuo-costruttive",dom:["visuospaziale","prassie"],desc:"Copia e costruzione di figure, organizzazione spaziale del disegno."},
+  {id:"visuo-percettive",nome:"Percezione ed esplorazione visiva",dom:["visuospaziale"],desc:"Discriminazione percettiva, esplorazione dello spazio, eventuale negligenza."},
+  {id:"prassie-appr",nome:"Prassie ideomotorie e ideative",dom:["prassie"],desc:"Imitazione di gesti, uso di oggetti, sequenze gestuali."},
+  {id:"umore-colloquio",nome:"Approfondimento su umore e ansia",dom:["comportamento"],desc:"Colloquio clinico strutturato su tono dell'umore, ansia e consapevolezza di malattia."},
+  {id:"autonomie",nome:"Autonomie funzionali",dom:[],desc:"Intervista al paziente e a un familiare sull'impatto dei disturbi nelle attività quotidiane."}
+];
+const MODULE_BY_ID=Object.fromEntries(MODULES.map(m=>[m.id,m]));
+
+/* ---------- Struttura predisposta per test validati e norme ----------
+   In questo prototipo il registro è VUOTO di proposito: i test pubblicati
+   sono protetti da copyright e le tabelle normative vanno riprese dalle
+   fonti originali con relativa licenza. Lo schema previsto per ogni voce:
+   { id, nome, dominio, fonteBibliografica,
+     campi:[{id,label,tipo:"numero"|"testo",min,max}],
+     norme:{ tipo:"eta-scolarita", note:"", dati:null } }
+   Quando saranno disponibili dati leciti, basterà popolare TEST_REGISTRY
+   e implementare la conversione in applyNorms(). */
+const TEST_REGISTRY=[];
+function applyNorms(testId,punteggioGrezzo,etaAnni,scolaritaAnni){
+  return {disponibile:false,
+    motivo:"Nessuna tabella normativa è installata in questo prototipo: il confronto con le norme va fatto sulle fonti originali."};
+}
+
+/* ---------- Modello dati ---------- */
+function nowISO(){return new Date().toISOString();}
+function uid(){return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+function newSession(code){
+  const domains={};
+  DOMAINS.forEach(d=>{domains[d.id]={rating:"na",strumento:"",punteggio:"",note:""};});
+  return {
+    id:uid(), code:code||"", createdAt:nowISO(), updatedAt:nowISO(),
+    meta:{dataValutazione:(new Date()).toISOString().slice(0,10),esaminatore:"",etaAnni:"",scolaritaAnni:"",lateralita:"",motivo:"",anamnesi:""},
+    firstLevel:{domains, osservazioni:""},
+    classification:{confermataAt:null, basata:"", notaClinico:""},
+    secondLevel:{basata:"", items:[]},
+    report:{conclusioni:"", testoManuale:"", modificatoAt:null}
+  };
+}
+
+/* ---------- Validazione ---------- */
+const CODE_RE=/^[A-Za-z0-9][A-Za-z0-9._-]{1,23}$/;
+function validateCode(code,sessions,selfId){
+  if(!code||!code.trim()) return "Il codice pseudonimo è obbligatorio.";
+  if(!CODE_RE.test(code.trim()))
+    return "Codice non valido: da 2 a 24 caratteri, solo lettere, numeri, punto, trattino o underscore (niente spazi).";
+  if(sessions){
+    const dup=Object.values(sessions).some(s=>s.id!==selfId && s.code.toLowerCase()===code.trim().toLowerCase());
+    if(dup) return "Esiste già una sessione con questo codice: usare un codice diverso.";
+  }
+  return null;
+}
+function validateMeta(meta){
+  const errs={};
+  if(meta.etaAnni!==""&&meta.etaAnni!=null){
+    const n=Number(meta.etaAnni);
+    if(!Number.isInteger(n)||n<0||n>120) errs.etaAnni="Età non plausibile: inserire un numero intero tra 0 e 120.";
+  }
+  if(meta.scolaritaAnni!==""&&meta.scolaritaAnni!=null){
+    const n=Number(meta.scolaritaAnni);
+    if(!Number.isInteger(n)||n<0||n>30) errs.scolaritaAnni="Scolarità non plausibile: anni di studio tra 0 e 30.";
+  }
+  if(meta.dataValutazione){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(meta.dataValutazione)||isNaN(Date.parse(meta.dataValutazione)))
+      errs.dataValutazione="Data non valida.";
+    else if(meta.dataValutazione>(new Date()).toISOString().slice(0,10))
+      errs.dataValutazione="La data di valutazione non può essere nel futuro.";
+  }
+  return errs;
+}
+
+/* ---------- Classificazione preliminare (descrittiva, non diagnostica) ---------- */
+function classify(firstLevel){
+  const per={},deficits=[],borderlines=[],norma=[],nonValutati=[];
+  DOMAINS.forEach(d=>{
+    const r=(firstLevel.domains[d.id]||{}).rating||"na";
+    per[d.id]=r;
+    if(r==="deficit")deficits.push(d.id);
+    else if(r==="borderline")borderlines.push(d.id);
+    else if(r==="norma")norma.push(d.id);
+    else nonValutati.push(d.id);
+  });
+  const valutati=DOMAINS.length-nonValutati.length;
+  const nomi=ids=>ids.map(i=>DOMAIN_BY_ID[i].nome.toLowerCase()).join(", ");
+  let testo;
+  if(valutati===0) testo="Nessun dominio è stato ancora valutato al primo livello.";
+  else{
+    const parti=[];
+    if(deficits.length) parti.push("prestazione deficitaria in: "+nomi(deficits));
+    if(borderlines.length) parti.push("prestazione borderline in: "+nomi(borderlines));
+    if(!deficits.length&&!borderlines.length) parti.push("prestazioni nei limiti in tutti i domini valutati");
+    else if(norma.length) parti.push("prestazioni nei limiti in: "+nomi(norma));
+    testo="Al primo livello si osserva "+parti.join("; ")+".";
+  }
+  const warnings=[];
+  if(valutati>0&&nonValutati.length>0)
+    warnings.push("Domini non ancora valutati: "+nomi(nonValutati)+". La classificazione è parziale.");
+  if(per.orientamento==="deficit")
+    warnings.push("Con orientamento deficitario, interpretare con cautela le prestazioni negli altri domini (possibile effetto di uno stato confusionale o di scarsa collaborazione).");
+  const hash=DOMAINS.map(d=>per[d.id]).join("|");
+  return {per,deficits,borderlines,norma,nonValutati,valutati,testo,warnings,hash};
+}
+
+/* ---------- Selezione adattiva dei moduli di secondo livello ---------- */
+function proposeModules(cls){
+  const out=[];
+  MODULES.forEach(m=>{
+    let score=0;const reasons=[];
+    m.dom.forEach(did=>{
+      const r=cls.per[did];
+      if(r==="deficit"){score+=2;reasons.push(DOMAIN_BY_ID[did].nome+": deficit al primo livello");}
+      else if(r==="borderline"){score+=1;reasons.push(DOMAIN_BY_ID[did].nome+": prestazione borderline");}
+    });
+    if(m.id==="autonomie"&&cls.deficits.length>=2){
+      score+=2;reasons.push("Compromissione in più domini: utile valutare l'impatto funzionale quotidiano.");
+    }
+    if(score>0) out.push({id:m.id,score,priorita:score>=2?"alta":"media",motivi:reasons});
+  });
+  out.sort((a,b)=>b.score-a.score||MODULE_BY_ID[a.id].nome.localeCompare(MODULE_BY_ID[b.id].nome));
+  return out;
+}
+/* Fonde le nuove proposte con le decisioni già prese dal clinico:
+   - conserva inclusione/esiti/note dei moduli ancora proposti;
+   - conserva i moduli aggiunti a mano;
+   - conserva (segnalandoli) i moduli non più proposti ma già inclusi o compilati. */
+function mergeSecondLevel(prev,proposals){
+  const prevBy={},order=[];
+  (prev&&prev.items||[]).forEach(it=>{prevBy[it.id]=it;});
+  const items=[];
+  proposals.forEach(p=>{
+    const old=prevBy[p.id];
+    items.push({
+      id:p.id,origine:"proposta",priorita:p.priorita,motivi:p.motivi,
+      incluso:old?old.incluso:true,
+      esito:old?old.esito:"na",strumento:old?old.strumento:"",note:old?old.note:""
+    });
+    order.push(p.id);
+  });
+  (prev&&prev.items||[]).forEach(it=>{
+    if(order.includes(it.id))return;
+    const toccato=it.incluso||it.esito!=="na"||(it.note&&it.note.trim())||(it.strumento&&it.strumento.trim());
+    if(it.origine==="manuale"){
+      items.push(Object.assign({},it));
+    }else if(toccato){
+      items.push(Object.assign({},it,{origine:"proposta-precedente",motivi:["Non più proposto dopo l'aggiornamento del primo livello: verificare se mantenerlo."]}));
+    }
+  });
+  return items;
+}
+
+/* ---------- Bozza di referto ---------- */
+function fmtDateIT(iso){
+  if(!iso||!/^\d{4}-\d{2}-\d{2}/.test(iso))return iso||"";
+  const [y,m,d]=iso.slice(0,10).split("-");return d+"/"+m+"/"+y;
+}
+function buildReport(s){
+  const L=[];const push=t=>L.push(t);
+  const cls=classify(s.firstLevel);
+  push("BOZZA DI REFERTO NEUROPSICOLOGICO");
+  push("Documento di lavoro generato con NeuroScreen Clinico "+APPV+": da verificare, completare e firmare a cura del clinico.");
+  push("");
+  push("DATI DELLA VALUTAZIONE");
+  push("Codice pseudonimo: "+(s.code||"[mancante]"));
+  push("Data di valutazione: "+(fmtDateIT(s.meta.dataValutazione)||"[mancante]"));
+  if(s.meta.esaminatore) push("Esaminatore: "+s.meta.esaminatore);
+  const dem=[];
+  if(s.meta.etaAnni!=="")dem.push("età "+s.meta.etaAnni+" anni");
+  if(s.meta.scolaritaAnni!=="")dem.push("scolarità "+s.meta.scolaritaAnni+" anni");
+  if(s.meta.lateralita)dem.push("lateralità "+s.meta.lateralita);
+  if(dem.length)push("Dati anagrafici essenziali: "+dem.join(", ")+".");
+  push("");
+  push("MOTIVO DELLA VALUTAZIONE");
+  push(s.meta.motivo?s.meta.motivo.trim():"[da completare]");
+  if(s.meta.anamnesi&&s.meta.anamnesi.trim()){push("");push("NOTIZIE ANAMNESTICHE ESSENZIALI");push(s.meta.anamnesi.trim());}
+  push("");
+  push("PRIMO LIVELLO — SCREENING PER DOMINI");
+  const val=DOMAINS.filter(d=>cls.per[d.id]!=="na");
+  if(!val.length) push("Non ancora somministrato.");
+  val.forEach(d=>{
+    const e=s.firstLevel.domains[d.id];
+    let riga="- "+d.nome+": "+RATING_LABEL[e.rating];
+    const extra=[];
+    if(e.strumento&&e.strumento.trim())extra.push("strumento: "+e.strumento.trim());
+    if(e.punteggio!==""&&e.punteggio!=null&&String(e.punteggio).trim()!=="")extra.push("punteggio grezzo: "+String(e.punteggio).trim());
+    if(extra.length)riga+=" ("+extra.join("; ")+")";
+    if(e.note&&e.note.trim())riga+=". Nota: "+e.note.trim();
+    push(riga+".");
+  });
+  if(cls.nonValutati.length&&val.length)
+    push("Domini non valutati in questa sede: "+cls.nonValutati.map(i=>DOMAIN_BY_ID[i].nome.toLowerCase()).join(", ")+".");
+  if(s.firstLevel.osservazioni&&s.firstLevel.osservazioni.trim()){
+    push("");push("OSSERVAZIONI COMPORTAMENTALI DURANTE L'ESAME");push(s.firstLevel.osservazioni.trim());
+  }
+  push("");
+  push("CLASSIFICAZIONE PRELIMINARE DEI DOMINI (non diagnostica)");
+  push(cls.testo);
+  cls.warnings.forEach(w=>push("Avvertenza: "+w));
+  if(s.classification.notaClinico&&s.classification.notaClinico.trim())
+    push("Nota del clinico: "+s.classification.notaClinico.trim());
+  push("");
+  push("SECONDO LIVELLO — APPROFONDIMENTI");
+  const inclusi=(s.secondLevel.items||[]).filter(i=>i.incluso);
+  if(!inclusi.length) push("Nessun modulo di approfondimento selezionato.");
+  inclusi.forEach(it=>{
+    const m=MODULE_BY_ID[it.id];const nome=m?m.nome:it.id;
+    let riga="- "+nome+": "+(it.esito&&it.esito!=="na"?RATING_LABEL[it.esito]:"esito non ancora registrato");
+    if(it.strumento&&it.strumento.trim())riga+=" (strumento: "+it.strumento.trim()+")";
+    if(it.note&&it.note.trim())riga+=". Nota: "+it.note.trim();
+    push(riga+".");
+  });
+  push("");
+  push("CONCLUSIONI");
+  push(s.report.conclusioni&&s.report.conclusioni.trim()?s.report.conclusioni.trim():"[da completare a cura del clinico]");
+  push("");
+  push("Avvertenza: questa è una bozza generata automaticamente a partire dai dati inseriti. Non costituisce diagnosi; l'interpretazione dei punteggi rispetto a norme di riferimento e le conclusioni cliniche restano di esclusiva competenza e responsabilità del professionista.");
+  return L.join("\n");
+}
+
+/* ---------- Import / export ---------- */
+function exportPayload(sessions,onlyId){
+  const list=onlyId?[sessions[onlyId]]:Object.values(sessions);
+  return {app:"neuroscreen-clinico",formato:1,esportatoIl:nowISO(),sessioni:list};
+}
+function sanitizeSession(raw){
+  if(!raw||typeof raw!=="object")return null;
+  if(typeof raw.code!=="string"||!raw.code)return null;
+  const base=newSession(raw.code);
+  base.id=(typeof raw.id==="string"&&raw.id)?raw.id:base.id;
+  base.createdAt=typeof raw.createdAt==="string"?raw.createdAt:base.createdAt;
+  base.updatedAt=typeof raw.updatedAt==="string"?raw.updatedAt:base.updatedAt;
+  if(raw.meta&&typeof raw.meta==="object")
+    Object.keys(base.meta).forEach(k=>{if(typeof raw.meta[k]==="string"||typeof raw.meta[k]==="number")base.meta[k]=String(raw.meta[k]);});
+  if(raw.firstLevel&&typeof raw.firstLevel==="object"){
+    if(typeof raw.firstLevel.osservazioni==="string")base.firstLevel.osservazioni=raw.firstLevel.osservazioni;
+    const doms=raw.firstLevel.domains||{};
+    DOMAINS.forEach(d=>{
+      const e=doms[d.id];if(!e||typeof e!=="object")return;
+      const t=base.firstLevel.domains[d.id];
+      if(RATINGS.some(r=>r.id===e.rating))t.rating=e.rating;
+      ["strumento","punteggio","note"].forEach(k=>{if(typeof e[k]==="string"||typeof e[k]==="number")t[k]=String(e[k]);});
+    });
+  }
+  if(raw.classification&&typeof raw.classification==="object"){
+    if(typeof raw.classification.notaClinico==="string")base.classification.notaClinico=raw.classification.notaClinico;
+    if(typeof raw.classification.confermataAt==="string")base.classification.confermataAt=raw.classification.confermataAt;
+    if(typeof raw.classification.basata==="string")base.classification.basata=raw.classification.basata;
+  }
+  if(raw.secondLevel&&typeof raw.secondLevel==="object"){
+    if(typeof raw.secondLevel.basata==="string")base.secondLevel.basata=raw.secondLevel.basata;
+    if(Array.isArray(raw.secondLevel.items))
+      base.secondLevel.items=raw.secondLevel.items.filter(it=>it&&typeof it==="object"&&typeof it.id==="string").map(it=>({
+        id:it.id,
+        origine:["proposta","manuale","proposta-precedente"].includes(it.origine)?it.origine:"proposta",
+        priorita:["alta","media"].includes(it.priorita)?it.priorita:"media",
+        motivi:Array.isArray(it.motivi)?it.motivi.filter(x=>typeof x==="string"):[],
+        incluso:!!it.incluso,
+        esito:RATINGS.some(r=>r.id===it.esito)?it.esito:"na",
+        strumento:typeof it.strumento==="string"?it.strumento:"",
+        note:typeof it.note==="string"?it.note:""
+      }));
+  }
+  if(raw.report&&typeof raw.report==="object"){
+    ["conclusioni","testoManuale"].forEach(k=>{if(typeof raw.report[k]==="string")base.report[k]=raw.report[k];});
+    if(typeof raw.report.modificatoAt==="string")base.report.modificatoAt=raw.report.modificatoAt;
+  }
+  return base;
+}
+function parseImport(text){
+  let obj;
+  try{obj=JSON.parse(text);}catch(e){return {ok:false,errore:"Il file non è un JSON valido."};}
+  if(!obj||obj.app!=="neuroscreen-clinico"||!Array.isArray(obj.sessioni))
+    return {ok:false,errore:"Il file non è un'esportazione di NeuroScreen Clinico."};
+  if(obj.formato!==1)
+    return {ok:false,errore:"Formato di esportazione non riconosciuto (atteso: 1, trovato: "+obj.formato+")."};
+  const sessions=obj.sessioni.map(sanitizeSession).filter(Boolean);
+  if(!sessions.length) return {ok:false,errore:"Il file non contiene sessioni valide."};
+  return {ok:true,sessions,scartate:obj.sessioni.length-sessions.length};
+}
+/*NS-LOGIC-END*/
+
+/* ================================================================
+   Livello applicativo / DOM
+   ================================================================ */
+let state=null;
+let currentView="home";
+let saveTimer=null;
+
+function defaultState(){return {version:1,sessions:{},currentId:null};}
+function loadState(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(!raw)return defaultState();
+    const st=JSON.parse(raw);
+    if(!st||typeof st!=="object"||typeof st.sessions!=="object")return defaultState();
+    const clean=defaultState();
+    Object.values(st.sessions||{}).forEach(s=>{const c=sanitizeSession(s);if(c)clean.sessions[c.id]=c;});
+    clean.currentId=(st.currentId&&clean.sessions[st.currentId])?st.currentId:null;
+    return clean;
+  }catch(e){
+    console.error(e);
+    toast("Dati locali illeggibili: è stato avviato un archivio vuoto. I dati precedenti non sono stati cancellati.","error");
+    return defaultState();
+  }
+}
+function persist(){
+  try{localStorage.setItem(LS_KEY,JSON.stringify(state));setSavedFlag(true);}
+  catch(e){
+    console.error(e);
+    toast("Salvataggio locale non riuscito (spazio esaurito o archiviazione bloccata dal browser). Esportare subito i dati per non perderli.","error");
+    setSavedFlag(false);
+  }
+}
+function touchSession(){
+  const s=cur();if(!s)return;
+  s.updatedAt=nowISO();
+  clearTimeout(saveTimer);saveTimer=setTimeout(persist,300);
+}
+function cur(){return state.currentId?state.sessions[state.currentId]:null;}
+
+/* ---------- Utility DOM ---------- */
+const $=sel=>document.querySelector(sel);
+function esc(x){return String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function toast(msg,kind){
+  const el=document.createElement("div");
+  el.className="toast"+(kind?" "+kind:"");el.textContent=msg;
+  $("#toasts").appendChild(el);
+  setTimeout(()=>el.remove(),kind==="error"?7000:3500);
+}
+function setSavedFlag(ok){
+  const el=$("#savedFlag");if(el)el.textContent=ok?"Salvato sul dispositivo":"NON salvato";
+}
+window.addEventListener("error",e=>{toast("Errore inatteso dell'applicazione: "+(e.message||"sconosciuto"),"error");});
+
+/* ---------- Percorso e stepper ---------- */
+const STEPS=[
+  {id:"meta",n:1,label:"Sessione"},
+  {id:"primo",n:2,label:"Primo livello"},
+  {id:"classificazione",n:3,label:"Classificazione"},
+  {id:"secondo",n:4,label:"Secondo livello"},
+  {id:"referto",n:5,label:"Referto"}
+];
+function stepEnabled(id){
+  const s=cur();if(!s)return false;
+  const cls=classify(s.firstLevel);
+  switch(id){
+    case "meta":case "primo":return true;
+    case "classificazione":return cls.valutati>0;
+    case "secondo":return !!s.classification.confermataAt;
+    case "referto":return true;
+    default:return false;
+  }
+}
+function stepDisabledMsg(id){
+  if(id==="classificazione")return "Prima valutare almeno un dominio al primo livello.";
+  if(id==="secondo")return "Prima confermare la classificazione preliminare (passo 3).";
+  return "";
+}
+function renderStepper(){
+  const nav=$("#stepper");const s=cur();
+  if(!s){nav.innerHTML="";return;}
+  const cls=classify(s.firstLevel);
+  const doneMap={
+    meta:!validateCode(s.code)&&Object.keys(validateMeta(s.meta)).length===0,
+    primo:cls.valutati===DOMAINS.length,
+    classificazione:!!s.classification.confermataAt,
+    secondo:(s.secondLevel.items||[]).some(i=>i.incluso&&i.esito!=="na"),
+    referto:!!(s.report.conclusioni&&s.report.conclusioni.trim())
+  };
+  nav.innerHTML=STEPS.map(st=>{
+    const en=stepEnabled(st.id);
+    return `<button class="step${currentView===st.id?" active":""}${doneMap[st.id]?" done":""}"
+      data-action="goto" data-view="${st.id}" ${en?"":'aria-disabled="true"'}>
+      <span class="n">${st.n}</span>${st.label}</button>`;
+  }).join("");
+}
+
+/* ---------- Viste ---------- */
+function render(){
+  const s=cur();
+  $("#appver").textContent=APPV;
+  const top=$("#topSess");
+  if(s){top.hidden=false;top.textContent="Sessione: "+(s.code||"(senza codice)");}
+  else top.hidden=true;
+  renderStepper();
+  const views={home:viewHome,meta:viewMeta,primo:viewPrimo,classificazione:viewClassificazione,secondo:viewSecondo,referto:viewReferto};
+  $("#app").innerHTML=(views[currentView]||viewHome)();
+}
+function go(view){
+  if(view!=="home"&&!cur()){currentView="home";render();return;}
+  if(view!=="home"&&!stepEnabled(view)){toast(stepDisabledMsg(view)||"Passaggio non ancora disponibile.");return;}
+  currentView=view;render();window.scrollTo(0,0);
+}
+
+function viewHome(){
+  const list=Object.values(state.sessions).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+  const rows=list.map(s=>{
+    const cls=classify(s.firstLevel);
+    const stato=s.classification.confermataAt
+      ?((s.secondLevel.items||[]).some(i=>i.incluso)?"secondo livello in corso":"classificazione confermata")
+      :(cls.valutati>0?"primo livello in corso":"appena creata");
+    return `<div class="sess-item">
+      <div class="grow">
+        <div class="code">${esc(s.code)}</div>
+        <div class="info">Ultima modifica: ${esc(fmtDateIT(s.updatedAt.slice(0,10)))} — ${esc(stato)}</div>
+      </div>
+      <button data-action="open" data-id="${s.id}" class="primary">Apri</button>
+      <button data-action="export-one" data-id="${s.id}">Esporta</button>
+      <button data-action="delete" data-id="${s.id}" class="danger">Elimina</button>
+    </div>`;
+  }).join("");
+  return `
+  <div class="banner info">Percorso guidato in 5 passi: dati di sessione, batteria di primo livello,
+  classificazione preliminare dei domini, approfondimenti di secondo livello proposti dall'app
+  (modificabili dal clinico) e bozza di referto. Nessun dato lascia questo dispositivo.</div>
+  <div class="card">
+    <h3>Nuova sessione</h3>
+    <p class="muted small">Identificare il paziente SOLO con un codice pseudonimo (es. "NP-2026-014").
+    L'abbinamento codice–persona va conservato altrove, fuori da questa applicazione.</p>
+    <label for="newCode">Codice pseudonimo</label>
+    <input type="text" id="newCode" maxlength="24" autocomplete="off" placeholder="es. NP-2026-014">
+    <div class="field-err" id="newCodeErr"></div>
+    <div class="btnrow">
+      <button class="primary" data-action="new-session">Crea sessione</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Sessioni salvate (${list.length})</h3>
+    ${rows||'<p class="muted">Nessuna sessione: crearne una qui sopra, oppure importarne dal riquadro sotto.</p>'}
+  </div>
+  <div class="card">
+    <h3>Copia di sicurezza</h3>
+    <p class="muted small">I dati vivono solo nel browser di questo dispositivo: esportarli
+    regolarmente in un file JSON (che resta anch'esso locale).</p>
+    <div class="btnrow">
+      <button data-action="export-all" ${list.length?"":"disabled"}>Esporta tutte le sessioni</button>
+      <button data-action="import">Importa da file</button>
+    </div>
+  </div>`;
+}
+
+function metaField(id,label,type,val,err,attrs){
+  return `<div><label for="f_${id}">${label}</label>
+  <input type="${type}" id="f_${id}" data-bind="meta.${id}" value="${esc(val)}" ${err?'aria-invalid="true"':""} ${attrs||""}>
+  ${err?`<div class="field-err">${esc(err)}</div>`:""}</div>`;
+}
+function viewMeta(){
+  const s=cur();const errs=validateMeta(s.meta);const codeErr=validateCode(s.code,state.sessions,s.id);
+  return `
+  <div class="card">
+    <h3>Passo 1 — Dati della sessione</h3>
+    <p class="muted small">Solo dati essenziali e non identificativi. Età e scolarità serviranno,
+    in futuro, per il confronto con tabelle normative (non incluse in questo prototipo).</p>
+    <label for="f_code">Codice pseudonimo</label>
+    <input type="text" id="f_code" data-bind="code" value="${esc(s.code)}" maxlength="24" autocomplete="off" ${codeErr?'aria-invalid="true"':""}>
+    ${codeErr?`<div class="field-err">${esc(codeErr)}</div>`:""}
+    <div class="grid2">
+      ${metaField("dataValutazione","Data di valutazione","date",s.meta.dataValutazione,errs.dataValutazione)}
+      <div><label for="f_esaminatore">Esaminatore</label>
+      <input type="text" id="f_esaminatore" data-bind="meta.esaminatore" value="${esc(s.meta.esaminatore)}" autocomplete="off"></div>
+      ${metaField("etaAnni","Età (anni)","number",s.meta.etaAnni,errs.etaAnni,'min="0" max="120" inputmode="numeric"')}
+      ${metaField("scolaritaAnni","Scolarità (anni)","number",s.meta.scolaritaAnni,errs.scolaritaAnni,'min="0" max="30" inputmode="numeric"')}
+      <div><label for="f_lateralita">Lateralità</label>
+      <select id="f_lateralita" data-bind="meta.lateralita">
+        ${["","destrimane","mancino","ambidestro"].map(v=>`<option value="${v}"${s.meta.lateralita===v?" selected":""}>${v||"—"}</option>`).join("")}
+      </select></div>
+    </div>
+    <label for="f_motivo">Motivo della valutazione</label>
+    <textarea id="f_motivo" data-bind="meta.motivo" placeholder="es. riferite difficoltà di memoria da circa un anno">${esc(s.meta.motivo)}</textarea>
+    <label for="f_anamnesi">Notizie anamnestiche essenziali</label>
+    <textarea id="f_anamnesi" data-bind="meta.anamnesi" placeholder="Sintesi non identificativa: comorbilità rilevanti, farmaci con effetto cognitivo, esami già eseguiti…">${esc(s.meta.anamnesi)}</textarea>
+    <div class="btnrow">
+      <button data-action="goto" data-view="home">Elenco sessioni</button>
+      <span class="spacer"></span>
+      <span class="muted small" id="savedFlag">Salvato sul dispositivo</span>
+      <button class="primary" data-action="goto-validated" data-view="primo">Avanti: primo livello</button>
+    </div>
+  </div>`;
+}
+
+function viewPrimo(){
+  const s=cur();
+  const cards=DOMAINS.map(d=>{
+    const e=s.firstLevel.domains[d.id];
+    const btns=RATINGS.map(r=>`<button class="rate${e.rating===r.id?" sel-"+r.id:""}"
+      data-action="rate" data-dom="${d.id}" data-val="${r.id}" aria-pressed="${e.rating===r.id}">${r.label}</button>`).join("");
+    return `<div class="dom-card">
+      <div class="dom-head"><h4>${d.nome}</h4><span class="muted small">${d.desc}</span></div>
+      <div class="ratings">${btns}</div>
+      <details class="dom-more" ${ (e.strumento||e.punteggio||e.note) ? "open":"" }>
+        <summary>Strumento, punteggio e note</summary>
+        <div class="dom-extra">
+          <div><label for="st_${d.id}">Strumento utilizzato</label>
+          <input type="text" id="st_${d.id}" data-bind="firstLevel.domains.${d.id}.strumento" value="${esc(e.strumento)}" placeholder="nome del test somministrato" autocomplete="off"></div>
+          <div><label for="pg_${d.id}">Punteggio grezzo</label>
+          <input type="text" id="pg_${d.id}" data-bind="firstLevel.domains.${d.id}.punteggio" value="${esc(e.punteggio)}" inputmode="decimal" autocomplete="off"></div>
+        </div>
+        <label for="nt_${d.id}">Note qualitative</label>
+        <textarea id="nt_${d.id}" data-bind="firstLevel.domains.${d.id}.note">${esc(e.note)}</textarea>
+      </details>
+    </div>`;
+  }).join("");
+  const cls=classify(s.firstLevel);
+  return `
+  <div class="card">
+    <h3>Passo 2 — Batteria di primo livello (screening)</h3>
+    <p class="muted small">Per ogni dominio il clinico registra il giudizio sintetico sulla prestazione
+    osservata con gli strumenti che ha scelto e somministrato. Il prototipo non contiene test né norme:
+    il giudizio nella norma / borderline / deficit è del clinico, rispetto alle norme dello strumento usato.</p>
+    ${cards}
+    <label for="f_oss">Osservazioni comportamentali durante l'esame</label>
+    <textarea id="f_oss" data-bind="firstLevel.osservazioni" placeholder="collaborazione, consapevolezza, affaticabilità, linguaggio spontaneo…">${esc(s.firstLevel.osservazioni)}</textarea>
+    <div class="btnrow">
+      <button data-action="goto" data-view="meta">Indietro</button>
+      <span class="spacer"></span>
+      <span class="muted small" id="savedFlag">Salvato sul dispositivo</span>
+      <button class="primary" data-action="goto" data-view="classificazione" ${cls.valutati>0?"":"disabled"}>Avanti: classificazione</button>
+    </div>
+    ${cls.valutati===0?'<p class="muted small">Valutare almeno un dominio per proseguire.</p>':""}
+  </div>`;
+}
+
+function viewClassificazione(){
+  const s=cur();const cls=classify(s.firstLevel);
+  const righe=DOMAINS.map(d=>`<div class="sess-item">
+    <div class="grow">${d.nome}</div>
+    <span class="badge ${cls.per[d.id]}">${RATING_LABEL[cls.per[d.id]]}</span>
+  </div>`).join("");
+  const cambiata=s.classification.confermataAt&&s.classification.basata!==cls.hash;
+  return `
+  <div class="card">
+    <h3>Passo 3 — Classificazione preliminare dei domini</h3>
+    <p class="muted small">Sintesi descrittiva del primo livello. Non è una diagnosi:
+    serve solo a orientare la scelta degli approfondimenti.</p>
+    ${cambiata?'<div class="banner warn">Il primo livello è stato modificato dopo la conferma: ricontrollare la sintesi e confermare di nuovo per aggiornare le proposte del secondo livello.</div>':""}
+    ${righe}
+    <p style="margin-top:1rem">${esc(cls.testo)}</p>
+    ${cls.warnings.map(w=>`<div class="banner warn">${esc(w)}</div>`).join("")}
+    <label for="f_notacl">Nota del clinico sulla classificazione (facoltativa)</label>
+    <textarea id="f_notacl" data-bind="classification.notaClinico">${esc(s.classification.notaClinico)}</textarea>
+    <div class="btnrow">
+      <button data-action="goto" data-view="primo">Indietro</button>
+      <span class="spacer"></span>
+      <button class="primary" data-action="confirm-classification">
+        ${s.classification.confermataAt&&!cambiata?"Riconferma e aggiorna proposte":"Conferma e proponi approfondimenti"}
+      </button>
+    </div>
+    ${s.classification.confermataAt?`<p class="muted small">Confermata il ${esc(fmtDateIT(s.classification.confermataAt.slice(0,10)))}.</p>`:""}
+  </div>`;
+}
+
+function viewSecondo(){
+  const s=cur();const cls=classify(s.firstLevel);
+  const stantia=s.secondLevel.basata&&s.secondLevel.basata!==cls.hash;
+  const items=s.secondLevel.items||[];
+  const inCatalogo=new Set(items.map(i=>i.id));
+  const aggiungibili=MODULES.filter(m=>!inCatalogo.has(m.id));
+  const rows=items.map(it=>{
+    const m=MODULE_BY_ID[it.id];if(!m)return"";
+    const esiti=RATINGS.map(r=>`<option value="${r.id}"${it.esito===r.id?" selected":""}>${r.label}</option>`).join("");
+    return `<div class="mod-item">
+      <input type="checkbox" id="inc_${it.id}" data-action="toggle-mod" data-id="${it.id}" ${it.incluso?"checked":""} aria-label="Includi ${esc(m.nome)}">
+      <div class="body">
+        <label for="inc_${it.id}" style="margin:0;display:inline">${m.nome}</label>
+        ${it.origine==="proposta"?`<span class="badge prio-${it.priorita}">priorità ${it.priorita}</span>`:""}
+        ${it.origine==="manuale"?'<span class="badge na">aggiunto dal clinico</span>':""}
+        ${it.origine==="proposta-precedente"?'<span class="badge borderline">da ricontrollare</span>':""}
+        <div class="muted small">${m.desc}</div>
+        ${it.motivi&&it.motivi.length?`<div class="mod-reasons">Perché: ${esc(it.motivi.join(" · "))}</div>`:""}
+        ${it.incluso?`<div class="dom-extra" style="margin-top:.5rem">
+          <div><label for="es_${it.id}">Esito</label>
+          <select id="es_${it.id}" data-bind-item="${it.id}" data-field="esito">${esiti}</select></div>
+          <div><label for="str_${it.id}">Strumento utilizzato</label>
+          <input type="text" id="str_${it.id}" data-bind-item="${it.id}" data-field="strumento" value="${esc(it.strumento)}" autocomplete="off"></div>
+        </div>
+        <label for="mn_${it.id}">Note</label>
+        <textarea id="mn_${it.id}" data-bind-item="${it.id}" data-field="note">${esc(it.note)}</textarea>`:""}
+      </div>
+    </div>`;
+  }).join("");
+  return `
+  <div class="card">
+    <h3>Passo 4 — Approfondimenti di secondo livello</h3>
+    <p class="muted small">Proposte generate dalla classificazione preliminare (priorità alta = dominio
+    deficitario o più indizi convergenti). Il clinico decide: può escludere le proposte e aggiungere
+    altri moduli. Anche qui gli esiti sono giudizi del clinico sugli strumenti che ha scelto.</p>
+    ${stantia?'<div class="banner warn">Il primo livello è cambiato dopo la generazione di queste proposte: tornare al passo 3 e riconfermare la classificazione per aggiornarle.</div>':""}
+    ${rows||'<p class="muted">Nessuna proposta: con il primo livello nella norma non risultano approfondimenti indicati. È comunque possibile aggiungere moduli qui sotto.</p>'}
+    <div class="btnrow" style="align-items:center">
+      <label for="addMod" style="margin:0">Aggiungi modulo:</label>
+      <select id="addMod" style="width:auto;max-width:100%">
+        <option value="">— scegliere —</option>
+        ${aggiungibili.map(m=>`<option value="${m.id}">${m.nome}</option>`).join("")}
+      </select>
+      <button data-action="add-mod" ${aggiungibili.length?"":"disabled"}>Aggiungi</button>
+    </div>
+    <div class="btnrow">
+      <button data-action="goto" data-view="classificazione">Indietro</button>
+      <span class="spacer"></span>
+      <span class="muted small" id="savedFlag">Salvato sul dispositivo</span>
+      <button class="primary" data-action="goto" data-view="referto">Avanti: referto</button>
+    </div>
+  </div>`;
+}
+
+function viewReferto(){
+  const s=cur();
+  const testo=s.report.testoManuale||buildReport(s);
+  const manuale=!!s.report.testoManuale;
+  return `
+  <div class="card">
+    <h3>Passo 5 — Bozza di referto</h3>
+    <p class="muted small">Il testo è generato dai dati inseriti e può essere modificato liberamente
+    qui sotto. La bozza non è una diagnosi e va sempre rivista dal clinico prima di qualunque uso.</p>
+    <label for="f_conclusioni">Conclusioni del clinico (entrano nella bozza generata)</label>
+    <textarea id="f_conclusioni" data-bind="report.conclusioni">${esc(s.report.conclusioni)}</textarea>
+    ${manuale?'<div class="banner warn">Il testo qui sotto è stato modificato a mano: non si aggiorna più da solo. "Rigenera dalla scheda" lo ricostruisce dai dati (le modifiche manuali al testo andranno perse).</div>':""}
+    <label for="reportText">Testo della bozza</label>
+    <textarea id="reportText" data-report-edit spellcheck="false">${esc(testo)}</textarea>
+    <div class="btnrow">
+      <button data-action="regen-report">Rigenera dalla scheda</button>
+      <button data-action="copy-report">Copia il testo</button>
+      <button data-action="print-report" class="primary">Stampa / salva PDF</button>
+      <span class="spacer"></span>
+      <span class="muted small" id="savedFlag">Salvato sul dispositivo</span>
+    </div>
+    <div class="btnrow">
+      <button data-action="goto" data-view="secondo">Indietro</button>
+      <button data-action="export-one" data-id="${s.id}">Esporta questa sessione (JSON)</button>
+      <button data-action="goto" data-view="home">Chiudi e torna all'elenco</button>
+    </div>
+  </div>`;
+}
+
+/* ---------- Azioni ---------- */
+function setPath(obj,path,val){
+  const parts=path.split(".");let o=obj;
+  for(let i=0;i<parts.length-1;i++){o=o[parts[i]];if(o==null)return;}
+  o[parts[parts.length-1]]=val;
+}
+function downloadJSON(payload,nome){
+  try{
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);a.download=nome;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+    toast("File esportato: "+nome,"ok");
+  }catch(e){console.error(e);toast("Esportazione non riuscita: "+e.message,"error");}
+}
+
+const ACTIONS={
+  "goto":btn=>go(btn.dataset.view),
+  "goto-validated":btn=>{
+    const s=cur();
+    const codeErr=validateCode(s.code,state.sessions,s.id);
+    const errs=validateMeta(s.meta);
+    if(codeErr||Object.keys(errs).length){render();toast("Correggere i campi segnalati prima di proseguire.","error");return;}
+    go(btn.dataset.view);
+  },
+  "new-session":()=>{
+    const code=$("#newCode").value.trim();
+    const err=validateCode(code,state.sessions,null);
+    if(err){$("#newCodeErr").textContent=err;$("#newCode").setAttribute("aria-invalid","true");return;}
+    const s=newSession(code);
+    state.sessions[s.id]=s;state.currentId=s.id;persist();
+    currentView="meta";render();
+    toast("Sessione "+code+" creata.","ok");
+  },
+  "open":btn=>{state.currentId=btn.dataset.id;persist();currentView="meta";render();},
+  "delete":btn=>{
+    const s=state.sessions[btn.dataset.id];if(!s)return;
+    if(!confirm('Eliminare definitivamente la sessione "'+s.code+'"? L\'operazione non si può annullare.'))return;
+    delete state.sessions[btn.dataset.id];
+    if(state.currentId===btn.dataset.id)state.currentId=null;
+    persist();render();toast("Sessione eliminata.");
+  },
+  "export-one":btn=>{
+    const s=state.sessions[btn.dataset.id];if(!s)return;
+    downloadJSON(exportPayload(state.sessions,s.id),"neuroscreen-"+s.code+"-"+s.meta.dataValutazione+".json");
+  },
+  "export-all":()=>downloadJSON(exportPayload(state.sessions),"neuroscreen-backup-"+(new Date()).toISOString().slice(0,10)+".json"),
+  "import":()=>$("#fileImport").click(),
+  "rate":btn=>{
+    const s=cur();const e=s.firstLevel.domains[btn.dataset.dom];
+    e.rating=btn.dataset.val;touchSession();render();
+  },
+  "confirm-classification":()=>{
+    const s=cur();const cls=classify(s.firstLevel);
+    s.classification.confermataAt=nowISO();
+    s.classification.basata=cls.hash;
+    s.secondLevel.items=mergeSecondLevel(s.secondLevel,proposeModules(cls));
+    s.secondLevel.basata=cls.hash;
+    touchSession();persist();
+    go("secondo");
+    toast("Proposte di secondo livello aggiornate.","ok");
+  },
+  "toggle-mod":btn=>{
+    const s=cur();const it=(s.secondLevel.items||[]).find(i=>i.id===btn.dataset.id);
+    if(!it)return;it.incluso=btn.checked;touchSession();render();
+  },
+  "add-mod":()=>{
+    const s=cur();const sel=$("#addMod");const id=sel.value;
+    if(!id){toast("Scegliere prima un modulo dall'elenco.");return;}
+    if((s.secondLevel.items||[]).some(i=>i.id===id))return;
+    s.secondLevel.items.push({id,origine:"manuale",priorita:"media",motivi:[],incluso:true,esito:"na",strumento:"",note:""});
+    touchSession();render();
+  },
+  "regen-report":()=>{
+    const s=cur();
+    if(s.report.testoManuale&&!confirm("Rigenerare la bozza dai dati della scheda? Le modifiche manuali al testo andranno perse."))return;
+    s.report.testoManuale="";s.report.modificatoAt=null;
+    touchSession();render();
+  },
+  "copy-report":()=>{
+    const txt=$("#reportText").value;
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(()=>toast("Testo copiato negli appunti.","ok"),
+        ()=>toast("Copia non riuscita: selezionare e copiare a mano.","error"));
+    }else{
+      $("#reportText").select();
+      toast(document.execCommand("copy")?"Testo copiato negli appunti.":"Copia non disponibile su questo browser.","ok");
+    }
+  },
+  "print-report":()=>{
+    $("#printArea").textContent=$("#reportText").value;
+    window.print();
+  }
+};
+
+document.addEventListener("click",e=>{
+  const btn=e.target.closest("[data-action]");
+  if(!btn)return;
+  const fn=ACTIONS[btn.dataset.action];
+  if(fn){try{fn(btn);}catch(err){console.error(err);toast("Errore: "+err.message,"error");}}
+});
+document.addEventListener("input",e=>{
+  const el=e.target;const s=cur();if(!s)return;
+  if(el.dataset.bind){
+    setPath(s,el.dataset.bind,el.value);
+    touchSession();
+    if(el.dataset.bind==="code"){const t=$("#topSess");if(t)t.textContent="Sessione: "+(el.value||"(senza codice)");}
+  }else if(el.dataset.bindItem){
+    const it=(s.secondLevel.items||[]).find(i=>i.id===el.dataset.bindItem);
+    if(it){it[el.dataset.field]=el.value;touchSession();}
+  }else if(el.hasAttribute("data-report-edit")){
+    s.report.testoManuale=el.value;s.report.modificatoAt=nowISO();touchSession();
+  }
+});
+$("#fileImport").addEventListener("change",async e=>{
+  const f=e.target.files[0];e.target.value="";
+  if(!f)return;
+  let text;
+  try{text=await f.text();}catch(err){toast("Impossibile leggere il file.","error");return;}
+  const res=parseImport(text);
+  if(!res.ok){toast(res.errore,"error");return;}
+  let nuove=0,rinominate=0;
+  res.sessions.forEach(s=>{
+    if(state.sessions[s.id])s.id=uid();
+    const esiste=c=>Object.values(state.sessions).some(x=>x.code.toLowerCase()===c.toLowerCase());
+    if(esiste(s.code)){
+      let n=2,c;
+      do{c=(s.code.slice(0,20)+"-i"+n).slice(0,24);n++;}while(esiste(c));
+      s.code=c;rinominate++;
+    }
+    state.sessions[s.id]=s;nuove++;
+  });
+  persist();render();
+  toast("Importate "+nuove+" sessioni"+(rinominate?" ("+rinominate+" rinominate per evitare doppioni)":"")+(res.scartate?"; "+res.scartate+" voci non valide scartate":"")+".","ok");
+});
+state=loadState();
+render();
+</script>
+</body>
+</html>

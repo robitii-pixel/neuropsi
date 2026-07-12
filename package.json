@@ -1,0 +1,9 @@
+{
+  "name": "neuroscreen-clinico",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Prototipo locale di valutazione neuropsicologica guidata: nessun backend, nessuna dipendenza.",
+  "scripts": {
+    "check": "node qa.js"
+  }
+}
