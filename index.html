@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="NeuroScreen Clinico — prototipo locale di valutazione neuropsicologica guidata. Nessun dato lascia questo dispositivo.">
+<meta name="theme-color" content="#0b5cad">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icona-192.png">
+<link rel="apple-touch-icon" href="icona-192.png">
 <title>NeuroScreen Clinico — prototipo</title>
 <style>
 :root{
@@ -138,7 +142,7 @@ details.dom-more summary{cursor:pointer;color:var(--brand);font-size:.9rem;min-h
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v1";
+const APPV="v2";
 const LS_KEY="neuroscreen_v1";
 const RATINGS=[
   {id:"na",label:"Non valutato"},
@@ -945,6 +949,12 @@ $("#fileImport").addEventListener("change",async e=>{
   persist();render();
   toast("Importate "+nuove+" sessioni"+(rinominate?" ("+rinominate+" rinominate per evitare doppioni)":"")+(res.scartate?"; "+res.scartate+" voci non valide scartate":"")+".","ok");
 });
+/* PWA: solo quando l'app è servita via http(s) (GitHub Pages);
+   aperta come file locale il service worker non è disponibile e non serve */
+if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+
 state=loadState();
 render();
 </script>

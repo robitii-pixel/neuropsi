@@ -298,6 +298,27 @@ t("HTML: viewport mobile e input da 16px (anti-zoom iOS)",()=>{
   ok(/font-size:\s*16px/.test(html));
 });
 
+/* ---- PWA (pubblicazione su GitHub Pages) ---- */
+t("PWA: manifest valido e coerente con le icone presenti",()=>{
+  const man=JSON.parse(fs.readFileSync(path.join(__dirname,"manifest.json"),"utf8"));
+  eq(man.name,"NeuroScreen Clinico");
+  eq(man.display,"standalone");
+  ok(Array.isArray(man.icons)&&man.icons.length===2);
+  man.icons.forEach(i=>ok(fs.existsSync(path.join(__dirname,i.src)),"icona mancante: "+i.src));
+  ok(/name="manifest"|rel="manifest"/.test(html),"index.html non collega il manifest");
+});
+t("PWA: service worker rete-prima con no-store e fallback (mai cache-prima per la pagina)",()=>{
+  const sw=fs.readFileSync(path.join(__dirname,"sw.js"),"utf8");
+  ok(sw.includes('cache:"no-store"'),"manca cache:no-store");
+  ok(/timeout/.test(sw),"manca il limite di attesa");
+  ok(/cache\.match\("index\.html"\)/.test(sw),"manca il fallback alla versione salvata");
+  new Function(sw.replace(/^"use strict";/,"")); // solo verifica di sintassi
+});
+t("PWA: registrazione solo su http(s), mai da file locale",()=>{
+  ok(/serviceWorker/.test(html));
+  ok(/https\?:\$?/.test(html)||/location\.protocol/.test(html),"manca il controllo sul protocollo");
+});
+
 console.log("");
 if(failed){console.error("QA: "+failed+" test falliti, "+passed+" superati.");process.exit(1);}
 console.log("QA: tutti i "+passed+" test superati.");
