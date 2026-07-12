@@ -10,6 +10,10 @@ const path=require("path");
 const vm=require("vm");
 
 const html=fs.readFileSync(path.join(__dirname,"index.html"),"utf8");
+const fullScript=html.match(/<script>([\s\S]*?)<\/script>/);
+if(!fullScript){console.error("FATALE: script principale non trovato");process.exit(1);}
+try{new Function(fullScript[1]);}
+catch(e){console.error("FATALE: JavaScript completo non valido:",e.message);process.exit(1);}
 const m=html.match(/\/\*NS-LOGIC-START\*\/([\s\S]*?)\/\*NS-LOGIC-END\*\//);
 if(!m){console.error("FATALE: marcatori NS-LOGIC non trovati in index.html");process.exit(1);}
 const ctx={console};

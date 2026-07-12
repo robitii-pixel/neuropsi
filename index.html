@@ -181,7 +181,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v5";
+const APPV="v6";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -1426,6 +1426,9 @@ function guidePanel(tid){
 function who5Form(e,assistito){
   const g=TEST_GUIDES.who5;const opts=[[5,"Sempre"],[4,"La maggior parte del tempo"],[3,"Più della metà del tempo"],[2,"Meno della metà del tempo"],[1,"A volte"],[0,"Mai"]];
   const score=who5Score(e);
+  const risultato=score
+    ?`<div class="banner info"><strong>Punteggio registrato: ${score.grezzo}/25</strong> (${score.percentuale}/100). ${score.approfondire?"La fonte OMS consiglia un approfondimento con un questionario diagnostico della depressione; la valutazione spetta al medico.":"Il risultato non genera una diagnosi e va letto nel contesto clinico."}</div>`
+    :'<p class="muted">Completa tutte le risposte per ottenere il punteggio grezzo.</p>';
   return `<div class="${assistito?"assist-card":""}">
     <h3>${assistito?"Questionario sul benessere":"WHO-5 — compilazione guidata"}</h3>
     <p>${assistito?"Per ciascuna frase, scegli la risposta che più si avvicina a come ti sei sentito/a nelle ultime due settimane.":"Consegnare il dispositivo alla persona oppure leggere gli item senza modificarli."}</p>
@@ -1433,7 +1436,7 @@ function who5Form(e,assistito){
       <select id="who5_${i}" data-answer-test="who5" data-answer-index="${i}">
         <option value="">Scegli una risposta</option>${opts.map(([v,l])=>`<option value="${v}"${e.risposte[i]===v?" selected":""}>${l}</option>`).join("")}
       </select></div>`).join("")}
-    ${score?`<div class="banner info"><strong>Punteggio registrato: ${score.grezzo}/25</strong> (${score.percentuale}/100). ${score.approfondire?"La fonte OMS consiglia un approfondimento con un questionario diagnostico della depressione; la valutazione spetta al medico.":"Il risultato non genera una diagnosi e va letto nel contesto clinico."}</div>`:"<p class="muted">Completa tutte le risposte per ottenere il punteggio grezzo.</p>"}
+    ${risultato}
     <p class="muted small">World Health Organization, WHO-5, 2024. Licenza CC BY-NC-SA 3.0 IGO. La traduzione italiana precede l’assegnazione del copyright all’OMS; in caso di difformità prevale l’originale inglese.</p>
   </div>`;
 }
