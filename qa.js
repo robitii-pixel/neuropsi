@@ -22,7 +22,7 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "CATS","TESTS","TEST_BY_ID","BATTERIA_BASE","VALIDITA","validitaInterferenze",
   "TEST_GUIDES","testGuide","who5Score","guidedNext",
   "newSession","newSomm","validateCode","validateAnagrafica","validateSomm",
-  "MSG_NO_NORME","validateNormPack","validateMaterialPack","materialScore","scoreTest","testsOfDomain","domainProfile","profileHash",
+  "MSG_NO_NORME","validateNormPack","validateMaterialPack","materialScore","OPEN_MATERIALS","materialForTest","scoreTest","testsOfDomain","domainProfile","profileHash",
   "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
   "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
   "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport",
@@ -90,6 +90,14 @@ t("materiali autorizzati: licenza obbligatoria, schema e scoring",()=>{
   eq(L.validateMaterialPack(packMateriale),null);
   ok(L.validateMaterialPack(Object.assign({},packMateriale,{licenza:{confermata:false,riferimento:""}})));
   eq(L.materialScore(packMateriale,{risposte:{a:"1",b:"nota"}}),{completo:true,completi:2,totale:1,allerta:true});
+});
+t("PHQ-9 e GAD-7: materiali italiani completi, scoring e sicurezza",()=>{
+  const phq=L.materialForTest("depressione",[]),gad=L.materialForTest("ansia",[]);
+  eq(L.validateMaterialPack(phq),null);eq(L.validateMaterialPack(gad),null);
+  eq(phq.items.length,10);eq(gad.items.length,7);
+  const rp=Object.fromEntries(phq.items.map(x=>[x.id,"0"]));rp.p9="1";
+  const sp=L.materialScore(phq,{risposte:rp});ok(sp.completo);eq(sp.totale,1);ok(sp.allerta);
+  const rg=Object.fromEntries(gad.items.map(x=>[x.id,"3"]));eq(L.materialScore(gad,{risposte:rg}).totale,21);
 });
 t("flusso guidato: apre la prima prova incompleta e propone approfondimento WHO-5",()=>{
   const s=L.newSession("QA-FLOW");s.batteria=["who5","orientamento"];

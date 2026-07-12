@@ -182,7 +182,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v7";
+const APPV="v8";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -299,8 +299,8 @@ const TESTS=[
   T("adl","ADL","Attività di base della vita quotidiana","funzionale","autonomia",[],{dur:5,note:"Intervista a paziente e/o caregiver."}),
   T("iadl","IADL","Attività strumentali della vita quotidiana","funzionale","autonomia",[],{dur:5,note:"Intervista a paziente e/o caregiver."}),
   T("who5","WHO-5","Indice OMS-5 di benessere","funzionale","umore",[],{min:0,max:25,dur:3,aperto:true,note:"Questionario completo disponibile nell’app; fonte OMS 2024, CC BY-NC-SA 3.0 IGO."}),
-  T("depressione","DEP","Scala per sintomi depressivi","funzionale","umore",[],{dur:8}),
-  T("ansia","ANS","Scala per sintomi ansiosi","funzionale","umore",[],{dur:8}),
+  T("depressione","PHQ-9","Patient Health Questionnaire-9","funzionale","umore",[],{min:0,max:27,dur:5,aperto:true,note:"Versione italiana completa; una risposta positiva all’item 9 richiede revisione clinica immediata."}),
+  T("ansia","GAD-7","Generalized Anxiety Disorder-7","funzionale","umore",[],{min:0,max:21,dur:3,aperto:true,note:"Versione italiana completa e liberamente riproducibile."}),
   T("apatia","APA","Scala per apatia","funzionale","comportamento",["umore"],{dur:8}),
   T("comportamentale","NPS","Inventario dei sintomi comportamentali","funzionale","comportamento",[],{dur:10,note:"Intervista al caregiver."}),
   T("caregiver-burden","CBI","Scala di carico del caregiver","funzionale","comportamento",[],{dur:8,note:"Compilata dal caregiver."}),
@@ -318,7 +318,8 @@ const TEST_GUIDES={
     prima:"Verificare lingua, udito e possibilità di rispondere.",durante:"Porre domande naturali senza suggerire la risposta; annotare esitazioni e autocorrezioni.",dopo:"Registrare una sintesi qualitativa. Non è una prova standardizzata e non produce una classificazione automatica."},
   mmse:{tipo:"protetto",chi:"medico",scopo:"Screening cognitivo globale.",prima:"Usare esclusivamente il modulo e il manuale originali nella versione autorizzata.",durante:"Seguire alla lettera consegne, tempi e regole del manuale.",dopo:"Inserire qui punteggio e classificazione ricavati dalle norme appropriate. L'app non mostra item né calcola norme."},
   moca:{tipo:"protetto",chi:"medico",scopo:"Screening multidominio, con particolare sensibilità alle difficoltà lievi.",prima:"Accedere al materiale ufficiale; formazione e certificazione possono essere obbligatorie.",durante:"Non modificare consegne o stimoli e non esporre il test in modalità assistito.",dopo:"Registrare il risultato ottenuto secondo la documentazione ufficiale."},
-  depressione:{tipo:"manuale",chi:"medico",scopo:"Approfondire sintomi depressivi con lo strumento scelto dal clinico.",prima:"Scegliere uno strumento validato e legalmente disponibile per lingua e popolazione.",durante:"In presenza di contenuti di rischio, interrompere il solo percorso digitale e procedere alla valutazione clinica diretta.",dopo:"Registrare strumento, versione, punteggio e osservazioni."},
+  depressione:{tipo:"aperto",chi:"assistito",scopo:"Rilevare la frequenza di nove gruppi di sintomi depressivi nelle ultime due settimane.",prima:"Spiegare che è uno screening e predisporre la revisione immediata dell’item 9.",durante:"La persona sceglie una frequenza per ogni item senza ricevere interpretazioni automatiche.",dopo:"Somma 0–27. Qualunque risposta diversa da Mai all’item 9 richiede valutazione clinica diretta, indipendentemente dal totale."},
+  ansia:{tipo:"aperto",chi:"assistito",scopo:"Rilevare la frequenza di sette sintomi ansiosi nelle ultime due settimane.",prima:"Verificare che la persona comprenda le quattro opzioni di frequenza.",durante:"La persona risponde autonomamente o con lettura neutra degli item.",dopo:"Somma 0–21. Il risultato è uno screening e non una diagnosi."},
   "who5":{tipo:"aperto",chi:"assistito",scopo:"Misurare il benessere mentale riferito nelle ultime due settimane.",
     prima:"La persona risponde autonomamente, oppure il medico legge senza parafrasare.",durante:"Scegliere una risposta per ciascuna delle cinque affermazioni.",dopo:"Il punteggio grezzo è la somma delle risposte (0–25); il percentuale è il grezzo × 4. Non formula diagnosi.",
     fonte:"World Health Organization, WHO-5, 2024 — CC BY-NC-SA 3.0 IGO",
@@ -512,6 +513,35 @@ function materialScore(pack,e){
   });
   return {completo:completi===pack.items.length,completi,totale,allerta};
 }
+const FREQ4=[
+  {valore:"0",etichetta:"Mai",punti:0},{valore:"1",etichetta:"Molti giorni",punti:1},
+  {valore:"2",etichetta:"Più della metà dei giorni",punti:2},{valore:"3",etichetta:"Quasi tutti i giorni",punti:3}
+];
+const OPEN_MATERIALS=[
+  {app:"neuroscreen-materiali",formato:1,test:"depressione",titolo:"Patient Health Questionnaire-9",versione:"PHQ-9 italiano",
+    fonte:"Spitzer, Williams, Kroenke e colleghi; versione italiana diffusa da Pfizer",licenza:{confermata:true,riferimento:"Nessun permesso richiesto per riproduzione, traduzione, visualizzazione o distribuzione"},
+    istruzioniAssistito:"Durante le ultime due settimane, con quale frequenza è stato/a disturbato/a dai seguenti problemi?",
+    istruzioniMedico:"Far compilare tutti gli item. Controllare l’item 9 prima di lasciare la persona sola; il totale non sostituisce la valutazione clinica.",items:[
+      ["p1","Scarso interesse o piacere nel fare le cose"],["p2","Sentirsi giù, depresso/a o disperato/a"],
+      ["p3","Difficoltà ad addormentarsi o mantenere il sonno, o dormire troppo"],["p4","Sentirsi stanco/a o avere poca energia"],
+      ["p5","Scarso appetito o mangiare troppo"],["p6","Sentirsi in colpa o di essere un/una fallito/a o di aver danneggiato se stesso/a o la sua famiglia"],
+      ["p7","Difficoltà a concentrarsi sulle cose, come leggere il giornale o guardare la televisione"],
+      ["p8","Muoversi o parlare così lentamente che anche gli altri se ne accorgevano o, al contrario, essere così irrequieto/a o agitato/a da muoversi molto più del solito"],
+      ["p9","Pensare che sarebbe meglio essere morto/a o di farsi del male in qualche modo"]
+    ].map((x,i)=>({id:x[0],tipo:"scelta",testoMedico:x[1],testoAssistito:x[1],opzioni:FREQ4.map(o=>Object.assign({},o,(i===8&&o.valore!=="0")?{allerta:true}:{})),sicurezza:i===8})).concat([
+      {id:"impatto",tipo:"scelta",testoMedico:"Se ha riscontrato uno o più problemi, in che misura le hanno creato difficoltà nel lavoro, a casa o con gli altri?",testoAssistito:"Se hai riscontrato uno o più problemi, in che misura ti hanno creato difficoltà nel lavoro, a casa o con gli altri?",opzioni:[
+        {valore:"0",etichetta:"Nessuna difficoltà",punti:0},{valore:"1",etichetta:"Qualche difficoltà",punti:0},{valore:"2",etichetta:"Notevole difficoltà",punti:0},{valore:"3",etichetta:"Estrema difficoltà",punti:0}]}
+    ])},
+  {app:"neuroscreen-materiali",formato:1,test:"ansia",titolo:"Generalized Anxiety Disorder-7",versione:"GAD-7 italiano",
+    fonte:"Spitzer, Williams, Kroenke e colleghi; versione italiana Pfizer",licenza:{confermata:true,riferimento:"Nessun permesso richiesto per riproduzione, traduzione, visualizzazione o distribuzione"},
+    istruzioniAssistito:"Nelle ultime due settimane, con quale frequenza ciascuno dei seguenti problemi le ha dato fastidio?",
+    istruzioniMedico:"Far compilare i sette item senza suggerire le risposte. Registrare il totale grezzo e interpretarlo nel contesto clinico.",items:[
+      "Sentirsi nervoso/a, ansioso/a o teso/a","Non riuscire a smettere di preoccuparsi o a tenere sotto controllo le preoccupazioni",
+      "Preoccuparsi troppo per varie cose","Avere difficoltà a rilassarsi","Essere talmente irrequieto/a da far fatica a stare seduto/a fermo/a",
+      "Infastidirsi o irritarsi facilmente","Avere paura che possa succedere qualcosa di terribile"
+    ].map((q,i)=>({id:"g"+(i+1),tipo:"scelta",testoMedico:q,testoAssistito:q,opzioni:FREQ4.map(o=>Object.assign({},o))}))}
+];
+function materialForTest(id,importati){return (importati||[]).find(p=>p.test===id)||OPEN_MATERIALS.find(p=>p.test===id)||null;}
 function scoreTest(testId,inp,normPacks){
   const pack=(normPacks||[]).find(p=>p.test===testId);
   if(!pack)return {disponibile:false,messaggio:MSG_NO_NORME};
@@ -1509,7 +1539,7 @@ function viewProve(){
   const next=guidedNext(s);const assistito=s.modalita==="assistito";
   if(assistito){
     const tid=next.test;
-    const pack=tid&&(state.materialPacks||[]).find(p=>p.test===tid);
+    const pack=tid&&materialForTest(tid,state.materialPacks);
     if(!tid||(testGuide(tid).chi!=="assistito"&&!pack))return `<div class="card"><div class="mode-switch"><button data-action="set-mode" data-mode="medico">Torna all’interfaccia del medico</button></div><div class="assist-card"><h3>Attendi il medico</h3><p>La prossima attività richiede la conduzione del professionista. Non sono mostrati materiali clinici o risultati interpretativi.</p></div></div>`;
     const e=s.somministrazioni[tid]||(s.somministrazioni[tid]=newSomm());
     return `<div class="card"><div class="mode-switch"><button data-action="set-mode" data-mode="medico">Torna all’interfaccia del medico</button></div>${pack?materialForm(pack,e,true):(tid==="who5"?who5Form(e,true):"")}</div>`;
@@ -1519,7 +1549,7 @@ function viewProve(){
     const t=TEST_BY_ID[tid];
     if(!s.somministrazioni[tid])s.somministrazioni[tid]=newSomm();
     const e=s.somministrazioni[tid];
-    const materialPack=(state.materialPacks||[]).find(p=>p.test===tid);
+    const materialPack=materialForTest(tid,state.materialPacks);
     const errs=validateSomm(tid,e);
     const stati=[["completato","Completata"],["da-fare","Da fare"],["non-eseguito","Non eseguita"],["non-interpretabile","Non interpretabile"]];
     const sc=e.stato==="completato"?scoreTest(tid,{grezzo:e.grezzo,etaAnni:s.anagrafica.etaAnni,scolaritaAnni:s.anagrafica.scolaritaAnni,sesso:s.anagrafica.sesso},packs):null;
@@ -2008,7 +2038,7 @@ document.addEventListener("input",e=>{
   }else if(el.dataset.packAnswer){
     const tid=el.dataset.packAnswer;const eSom=s.somministrazioni[tid]||(s.somministrazioni[tid]=newSomm());
     eSom.risposte[el.dataset.answerIndex]=el.value;
-    const pack=(state.materialPacks||[]).find(p=>p.test===tid);const sc=materialScore(pack,eSom);
+    const pack=materialForTest(tid,state.materialPacks);const sc=materialScore(pack,eSom);
     if(sc&&sc.completo){eSom.grezzo=String(sc.totale);eSom.stato="completato";}
     touchSession();render();
   }else if(el.dataset.validita){

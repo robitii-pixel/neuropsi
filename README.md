@@ -90,6 +90,16 @@ Esempio minimo:
    "opzioni":[{"valore":"0","etichetta":"...","punti":0},{"valore":"1","etichetta":"...","punti":1}]}]}
 ```
 
+## Strumenti aperti integrati (v8)
+
+- **WHO-5 italiano**: 5 item, grezzo 0–25 e percentuale 0–100.
+- **PHQ-9 italiano**: 9 item più impatto funzionale, grezzo 0–27. Una risposta diversa
+  da “Mai” all’item 9 attiva un avviso di revisione clinica immediata, indipendente dal totale.
+- **GAD-7 italiano**: 7 item, grezzo 0–21.
+
+Nell’interfaccia assistito non vengono mostrate fasce interpretative o diagnosi; il medico vede
+il grezzo, la fonte e gli eventuali avvisi di sicurezza.
+
 ## Motore di scoring
 
 Separato dall'interfaccia (`scoreTest`), vuoto per progetto. Le norme si aggiungono
