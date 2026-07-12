@@ -1,8 +1,8 @@
-/* Smoke test end-to-end di NeuroScreen Clinico su 3 viewport
-   (desktop, tablet, smartphone). Strumento di sviluppo OPZIONALE:
-   l'app non ha dipendenze; questo test richiede playwright-core e un
-   Chromium in /opt/pw-browsers (o adattare EXE al proprio percorso).
-   Uso: npm run smoke */
+/* Smoke test end-to-end di NeuroScreen Clinico (percorso in 7 passi)
+   su 3 viewport (desktop, tablet, smartphone). Strumento di sviluppo
+   OPZIONALE: l'app non ha dipendenze; questo test richiede
+   playwright-core e un Chromium in /opt/pw-browsers (o adattare EXE).
+   Uso: node smoke.js */
 const {chromium}=require("playwright-core");
 const fs=require("fs");
 const EXE=fs.readdirSync("/opt/pw-browsers").filter(d=>/^chromium-\d+$/.test(d)).map(d=>`/opt/pw-browsers/${d}/chrome-linux/chrome`).find(p=>fs.existsSync(p));
@@ -26,89 +26,152 @@ const VIEWPORTS=[
     page.on("console",m=>{if(m.type()==="error")errors.push("console: "+m.text());});
     await page.goto(URL);
 
-    ok(await page.title()==="NeuroScreen Clinico — prototipo","titolo pagina");
-    ok(await page.locator("#newCode").isVisible(),"home: campo nuova sessione visibile");
+    ok(await page.title()==="NeuroScreen Clinico","titolo pagina");
+    ok((await page.textContent("body")).includes("non autorizzata per uso clinico reale"),"avviso versione dimostrativa");
 
     // validazione codice
     await page.fill("#newCode","nome cognome");
     await page.click('button[data-action="new-session"]');
     ok((await page.locator("#newCodeErr").textContent()).includes("Codice non valido"),"codice con spazi rifiutato");
 
-    // crea sessione
+    // passo 1: sessione e quesito
     await page.fill("#newCode","NP-2026-001");
     await page.click('button[data-action="new-session"]');
-    ok(await page.locator("#f_code").isVisible(),"passo 1 aperto dopo creazione");
-
-    // meta con errore di validazione
-    await page.fill("#f_etaAnni","130");
+    ok(await page.locator("#f_code").isVisible(),"passo 1 aperto");
+    await page.fill('[data-bind="anagrafica.etaAnni"]',"130");
     await page.click('button[data-action="goto-validated"]');
-    ok(await page.locator(".field-err").count()>0,"età 130 bloccata con messaggio");
-    await page.fill("#f_etaAnni","74");
-    await page.fill("#f_scolaritaAnni","8");
-    await page.fill("#f_motivo","Prova di percorso completo.");
+    ok(await page.locator(".field-err").count()>0,"età 130 bloccata");
+    await page.fill('[data-bind="anagrafica.etaAnni"]',"74");
+    await page.fill('[data-bind="anagrafica.scolaritaAnni"]',"8");
+    await page.fill("#f_quesito","Percorso di prova.");
     await page.click('button[data-action="goto-validated"]');
-    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 2")),"passo 2 raggiunto");
+    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 2")),"passo 2 (validità) raggiunto");
 
-    // stepper: passo 3 bloccato senza valutazioni
-    await page.click('.step[data-view="classificazione"]',{force:true});
-    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 2")),"passo 3 bloccato senza domini valutati");
+    // passo 2: validità con un fattore interferente
+    await page.selectOption("#v_vista","3");
+    await page.click('.step[data-view="batteria"]');
 
-    // valuta domini
-    await page.click('button[data-action="rate"][data-dom="memoria"][data-val="deficit"]');
-    await page.click('button[data-action="rate"][data-dom="esecutive"][data-val="deficit"]');
-    await page.click('button[data-action="rate"][data-dom="attenzione"][data-val="borderline"]');
-    await page.click('button[data-action="rate"][data-dom="linguaggio"][data-val="norma"]');
-    await page.click('.step[data-view="classificazione"]');
-    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 3")),"passo 3 raggiunto");
-    ok((await page.textContent("main")).includes("prestazione deficitaria in: memoria episodica"),"classificazione descrittiva presente");
+    // passo 3: batteria
+    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 3")),"passo 3 (batteria) raggiunto");
+    await page.click('.step[data-view="prove"]',{force:true});
+    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 3")),"passo 4 bloccato con batteria vuota");
+    await page.click('button[data-action="battery-base"]');
+    const nSel=Number(await page.textContent("#batCount"));
+    ok(nSel>=15,"batteria di base selezionata ("+nSel+" prove)");
+    await page.click('input[data-battery="mmse"]'); // toglie MMSE
+    ok(Number(await page.textContent("#batCount"))===nSel-1,"deselezione aggiorna il contatore");
+    await page.click('input[data-battery="mmse"]'); // lo rimette
+    await page.click('button.primary[data-action="goto-validated"][data-view="prove"]');
 
-    // passo 4 bloccato prima della conferma
+    // passo 4: somministrazione
+    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 4")),"passo 4 (somministrazione) raggiunto");
+    const ensureOpen=async tid=>page.evaluate(id=>{const d=document.querySelector("#card_"+id);if(d&&!d.open)d.open=true;},tid);
+    const setStato=async(tid,val)=>{await ensureOpen(tid);await page.click(`button[data-action="som-stato"][data-id="${tid}"][data-val="${val}"]`);};
+    const fill=async(tid,f,v)=>page.fill(`[data-som="${tid}"][data-field="${f}"]`,v);
+    const selCl=async(tid,v)=>page.selectOption(`#s_${tid}_cl`,v);
+    await setStato("mmse","completato");
+    await fill("mmse","grezzo","31");
+    // l'errore di range compare al re-render (cambio stato di un'altra prova)
+    await setStato("orientamento","completato");
+    ok((await page.textContent("main")).includes("Fuori dall'intervallo del test (0–30)"),"grezzo 31 su MMSE segnalato fuori range");
+    await fill("mmse","grezzo","26");
+    await selCl("mmse","borderline");
+    await selCl("orientamento","norma");
+    // cronometro
+    await ensureOpen("tmt-a");
+    await page.click('button[data-action="timer-start"][data-id="tmt-a"]');
+    await page.waitForTimeout(1200);
+    await page.click('button[data-action="timer-pause"][data-id="tmt-a"]');
+    const tempoTmt=await page.inputValue('[data-som="tmt-a"][data-field="tempoSec"]');
+    ok(Number(tempoTmt)>=1,"cronometro scrive il tempo ("+tempoTmt+"s)");
+    await setStato("tmt-a","completato");
+    await selCl("tmt-a","norma");
+    // memoria: pattern richiamo giù / riconoscimento ok
+    await setStato("lista-appr","completato");
+    await fill("lista-appr","grezzo","28");await fill("lista-appr","intrusioni","2");
+    await selCl("lista-appr","deficit");
+    await setStato("lista-diff","completato");
+    await fill("lista-diff","grezzo","2");await selCl("lista-diff","deficit");
+    await setStato("lista-ric","completato");
+    await fill("lista-ric","grezzo","13");await selCl("lista-ric","norma");
+    // fluenze giù, denominazione ok
+    await setStato("fluenza-fon","completato");
+    await fill("fluenza-fon","grezzo","18");await fill("fluenza-fon","perseverazioni","3");
+    await selCl("fluenza-fon","deficit");
+    await setStato("denominazione","completato");
+    await fill("denominazione","grezzo","48");await selCl("denominazione","norma");
+    // non interpretabile con motivo obbligatorio
+    await setStato("fluenza-sem","non-interpretabile");
+    await page.fill('#s_fluenza-sem_motivo',"prova interrotta");
+    // autonomia ridotta
+    await setStato("iadl","completato");
+    await fill("iadl","grezzo","3");await selCl("iadl","deficit");
+    // messaggio norme non integrate visibile
+    ok((await page.textContent("main")).includes("Norme non integrate"),"messaggio norme non integrate presente");
+    await page.fill("#f_oss","Collaborante. Prova.");
+
+    // passo 5: profilo
+    await page.click('.step[data-view="profilo"]');
+    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 5")),"passo 5 (profilo) raggiunto");
+    const mainTx=await page.textContent("main");
+    ok(mainTx.includes("Memoria episodica verbale"),"dominio memoria verbale nel profilo");
+    ok(/affidabilità/i.test(mainTx),"affidabilità mostrata");
+    // override del clinico su un dominio
+    await page.selectOption("#ov_velocita","borderline");
+    await page.fill("#ovn_velocita","rallentamento ai limiti");
+    // secondo livello bloccato prima della conferma
     await page.click('.step[data-view="secondo"]',{force:true});
-    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 3")),"passo 4 bloccato prima della conferma");
-    await page.click('button[data-action="confirm-classification"]');
-    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 4")),"conferma porta al passo 4");
-    const nProp=await page.locator(".mod-item").count();
-    ok(nProp>=4,"proposte generate ("+nProp+")");
-    ok((await page.textContent("main")).includes("Autonomie funzionali"),"autonomie proposte con 2 deficit");
+    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 5")),"passo 6 bloccato prima della conferma");
+    await page.click('button[data-action="confirm-profile"]');
 
-    // il clinico esclude una proposta e aggiunge un modulo
-    await page.click('input[data-action="toggle-mod"][data-id="mem-visiva"]');
-    await page.selectOption("#addMod","umore-colloquio");
+    // passo 6: approfondimenti
+    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 6")),"conferma porta al passo 6");
+    const props=await page.locator(".mod-item").count();
+    ok(props>=4,"proposte generate ("+props+")");
+    const secondoTx=await page.textContent("main");
+    ok(secondoTx.includes("riconoscimento relativamente conservato")||secondoTx.includes("Strategie di recupero"),"regola richiamo/riconoscimento attiva");
+    ok(secondoTx.includes("denominazione conservata"),"regola fluenze/denominazione attiva");
+    ok(secondoTx.includes("Perché:"),"motivazioni visibili");
+    await page.click('input[data-action="toggle-mod"][data-id="validita"]');
+    await page.selectOption("#addMod","umore");
     await page.click('button[data-action="add-mod"]');
     ok((await page.textContent("main")).includes("aggiunto dal clinico"),"modulo manuale aggiunto");
-    await page.selectOption("#es_mem-verbale","deficit");
-    await page.fill("#str_mem-verbale","strumento a scelta del clinico");
+    await page.selectOption("#es_amnestico","deficit");
 
-    // referto
+    // passo 7: referto
     await page.click('.step[data-view="referto"]');
+    await page.fill('[data-bind="referto.conclusioni"]',"Conclusioni di prova del clinico.");
     const rep=await page.inputValue("#reportText");
     ok(rep.includes("BOZZA DI REFERTO"),"referto generato");
-    ok(rep.includes("Memoria episodica verbale: deficit"),"esito secondo livello nel referto");
-    ok(!rep.includes("Memoria episodica visuo-spaziale"),"modulo escluso assente dal referto");
-    ok(rep.includes("Non costituisce diagnosi")||rep.includes("non costituisce diagnosi"),"avvertenza non diagnostica");
+    ok(rep.includes("6. PROVE SOMMINISTRATE"),"tabella risultati presente");
+    ok(rep.includes("non interpretabile"),"stato NI nel referto");
+    ok(rep.includes("beneficio relativo dal riconoscimento"),"frase qualitativa da regola");
+    ok(rep.includes("giudizio del clinico"),"override citato nel referto");
+    ok(rep.includes("Non costituisce diagnosi"),"avvertenza non diagnostica");
+    // versionamento
+    await page.click('button[data-action="save-version"]');
+    ok((await page.textContent("main")).includes("Versione 1"),"versione salvata ed elencata");
 
-    // persistenza: ricarica la pagina
+    // persistenza: ricarica
     await page.reload();
     ok((await page.textContent("main")).includes("NP-2026-001"),"sessione presente dopo reload");
     await page.click('button[data-action="open"]');
-    ok(await page.inputValue("#f_etaAnni")==="74","dati meta persistiti");
+    ok(await page.inputValue('[data-bind="anagrafica.etaAnni"]')==="74","anagrafica persistita");
+    await page.click('.step[data-view="prove"]');
+    ok(await page.inputValue('[data-som="mmse"][data-field="grezzo"]')==="26","punteggi persistiti");
     await page.click('.step[data-view="secondo"]');
-    ok(!(await page.isChecked("#inc_mem-visiva")),"esclusione del clinico persistita");
+    ok(!(await page.isChecked("#inc_validita")),"esclusione del clinico persistita");
+    ok(await page.locator("#es_amnestico").inputValue()==="deficit","esito approfondimento persistito");
 
-    // overflow orizzontale
+    // overflow orizzontale e tocchi
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
     ok(overflow<=0,"nessuno scroll orizzontale (overflow="+overflow+"px)");
-
-    // tocco minimo 44px sui controlli principali (solo mobile)
-    if(vp.name==="smartphone"){
+    if(vp.name!=="desktop"){
       const small=await page.evaluate(()=>[...document.querySelectorAll("button")].filter(b=>b.offsetParent&&b.getBoundingClientRect().height<44).map(b=>b.textContent.trim().slice(0,20)));
       ok(small.length===0,"tutti i pulsanti >=44px "+(small.length?JSON.stringify(small):""));
     }
-
     await page.screenshot({path:OUT+"/ns-"+vp.name+".png",fullPage:false});
     ok(errors.length===0,"nessun errore console/pagina"+(errors.length?": "+errors.join(" | "):""));
-
-    // pulizia localStorage per il viewport successivo (context separati: non serve, ma esplicito)
     await ctx.close();
   }
   await browser.close();

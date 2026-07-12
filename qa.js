@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-/* Suite QA di NeuroScreen Clinico.
+/* Suite QA di NeuroScreen Clinico (schema 2).
    Estrae il blocco di logica pura da index.html (marcatori NS-LOGIC) e
-   verifica classificazione, selezione moduli, referto, validazioni e import.
+   verifica catalogo, modello dati, validazioni, motore di scoring,
+   profilo per domini, selezione adattiva, referto, import e migrazione.
    Nessuna dipendenza esterna. Uso: npm run check */
 "use strict";
 const fs=require("fs");
@@ -13,16 +14,19 @@ const m=html.match(/\/\*NS-LOGIC-START\*\/([\s\S]*?)\/\*NS-LOGIC-END\*\//);
 if(!m){console.error("FATALE: marcatori NS-LOGIC non trovati in index.html");process.exit(1);}
 const ctx={console};
 vm.createContext(ctx);
-/* nel vm le const non finiscono sul global: esportiamo i simboli in coda */
-const EXPORTS=["APPV","LS_KEY","RATINGS","RATING_LABEL","DOMAINS","DOMAIN_BY_ID","MODULES","MODULE_BY_ID",
-  "TEST_REGISTRY","applyNorms","newSession","validateCode","validateMeta","classify","proposeModules",
-  "mergeSecondLevel","fmtDateIT","buildReport","exportPayload","sanitizeSession","parseImport","nowISO","uid"];
+const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_ID","domName",
+  "CATS","TESTS","TEST_BY_ID","BATTERIA_BASE","VALIDITA","validitaInterferenze",
+  "newSession","newSomm","validateCode","validateAnagrafica","validateSomm",
+  "MSG_NO_NORME","validateNormPack","scoreTest","testsOfDomain","domainProfile","profileHash",
+  "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
+  "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport",
+  "exportPayload","sanitizeSession","migrateV1","parseImport","demoSession","nowISO","uid"];
 try{
   vm.runInContext(m[1]+"\n;this.__NS={"+EXPORTS.join(",")+"};",ctx,{filename:"index.html <logica>"});
 }catch(e){
   console.error("FATALE: il blocco di logica non si esegue:",e.message);process.exit(1);
 }
-const L=ctx.__NS; // logica
+const L=ctx.__NS;
 
 let passed=0,failed=0;
 function t(nome,fn){
@@ -35,288 +39,359 @@ function eq(a,b,msg){
 }
 function ok(v,msg){if(!v)throw new Error(msg||"condizione falsa");}
 
-console.log("QA NeuroScreen Clinico — "+L.APPV);
+console.log("QA NeuroScreen Clinico — "+L.APPV+" (schema "+L.SCHEMA+")");
 
-/* ---- struttura di base ---- */
-t("8 domini definiti, id unici",()=>{
-  eq(L.DOMAINS.length,8);
-  eq(new Set(L.DOMAINS.map(d=>d.id)).size,8);
+/* ---------- catalogo ---------- */
+t("catalogo: >=45 test, id e sigle uniche, categorie e domini validi",()=>{
+  ok(L.TESTS.length>=45,"attesi almeno 45 test, trovati "+L.TESTS.length);
+  eq(new Set(L.TESTS.map(x=>x.id)).size,L.TESTS.length,"id duplicati");
+  eq(new Set(L.TESTS.map(x=>x.sigla)).size,L.TESTS.length,"sigle duplicate");
+  const catIds=new Set(L.CATS.map(c=>c.id));
+  const domIds=new Set(["screening"].concat(L.DOMS.map(d=>d.id)));
+  L.TESTS.forEach(x=>{
+    ok(catIds.has(x.cat),"categoria inesistente in "+x.id);
+    ok(domIds.has(x.dom),"dominio inesistente in "+x.id+": "+x.dom);
+    x.domSec.forEach(d=>ok(domIds.has(d),"dominio secondario inesistente in "+x.id));
+  });
 });
-t("catalogo moduli: id unici e domini esistenti",()=>{
-  eq(new Set(L.MODULES.map(m=>m.id)).size,L.MODULES.length);
-  L.MODULES.forEach(mod=>mod.dom.forEach(d=>ok(L.DOMAIN_BY_ID[d],"dominio inesistente: "+d)));
+t("catalogo: campi richiesti presenti su ogni test",()=>{
+  const campi=["id","sigla","nome","cat","dom","domSec","versione","lingua","etaRange","durataMin",
+    "sommin","scoring","min","max","usaTempo","tipiErrore","fonteNormativa","biblio","licenza",
+    "digitale","soloManuale","normeIntegrate","noteCliniche","configV","statoConfig"];
+  L.TESTS.forEach(x=>campi.forEach(c=>ok(c in x,"manca "+c+" in "+x.id)));
 });
-t("registro test validati vuoto e norme non applicabili (per scelta)",()=>{
-  eq(L.TEST_REGISTRY.length,0);
-  const r=L.applyNorms("x",10,70,8);
-  eq(r.disponibile,false);
-  ok(r.motivo.length>10);
+t("catalogo: nessun test con norme integrate, materiali o cut-off; licenze da verificare",()=>{
+  L.TESTS.forEach(x=>{
+    eq(x.normeIntegrate,false,x.id+" risulta con norme integrate");
+    eq(x.fonteNormativa,null,x.id+" ha una fonte normativa nel codice");
+    eq(x.soloManuale,true,x.id+" non è a sola registrazione manuale");
+    ok(x.licenza==="da-verificare"||x.licenza==="generico","licenza inattesa in "+x.id);
+  });
+  ok(!/cut-?off\s*[:=]\s*\d/i.test(html),"possibile cut-off numerico nel codice");
 });
-t("nessuna diagnosi automatica nei testi di classificazione",()=>{
+t("catalogo: i gruppi richiesti sono coperti",()=>{
+  const bySigla=Object.fromEntries(L.TESTS.map(x=>[x.sigla,x]));
+  ["MMSE","MoCA","ACE-III","M-ACE","FAB","DS-F","CS-F","TMT-A","TMT-B","SDMT","STROOP",
+   "TOKEN","CDT","ADL","IADL","CBI"].forEach(s=>ok(bySigla[s],"manca "+s));
+});
+t("batteria di base: id validi e copertura delle aree minime",()=>{
+  L.BATTERIA_BASE.forEach(id=>ok(L.TEST_BY_ID[id],"id inesistente in batteria base: "+id));
+  const doms=new Set();
+  L.BATTERIA_BASE.forEach(id=>{const x=L.TEST_BY_ID[id];doms.add(x.dom);x.domSec.forEach(d=>doms.add(d));});
+  ["screening","attenzione","mdl","mem-verbale","linguaggio","esecutive","visuospaziale","prassie","autonomia","umore","comportamento"]
+    .forEach(d=>ok(doms.has(d),"area non coperta dalla batteria base: "+d));
+});
+
+/* ---------- modello dati e validazioni ---------- */
+t("newSession: struttura schema 2 completa",()=>{
   const s=L.newSession("QA-1");
-  s.firstLevel.domains.memoria.rating="deficit";
-  s.firstLevel.domains.esecutive.rating="deficit";
-  const c=L.classify(s.firstLevel);
-  const banned=/demenza|alzheimer|diagnosi di|mci|deterioramento cognitivo lieve/i;
-  ok(!banned.test(c.testo),"testo classificazione contiene termini diagnostici");
-  ok(!banned.test(L.buildReport(s)),"referto contiene termini diagnostici");
+  ["anagrafica","quesito","validita","batteria","somministrazioni","osservazioni","profilo","secondLevel","referto"]
+    .forEach(k=>ok(k in s,"manca "+k));
+  ["etaAnni","sesso","scolaritaAnni","linguaMadre","professione","lateralita"].forEach(k=>ok(k in s.anagrafica,"manca anagrafica."+k));
+  ["quesitoClinico","sospettoDiagnostico","anamnesi","diagnosiNote","farmaci"].forEach(k=>ok(k in s.quesito,"manca quesito."+k));
+  ok(Array.isArray(s.referto.versioni));
 });
-
-/* ---- newSession ---- */
-t("newSession: tutti i domini partono non valutati",()=>{
-  const s=L.newSession("QA-2");
-  L.DOMAINS.forEach(d=>eq(s.firstLevel.domains[d.id].rating,"na"));
-  eq(s.secondLevel.items.length,0);
-  ok(!s.classification.confermataAt);
-});
-
-/* ---- validazioni ---- */
-t("validateCode: rifiuta vuoto, spazi, caratteri strani; accetta codici sensati",()=>{
+t("validateCode e validateAnagrafica",()=>{
   ok(L.validateCode(""),"vuoto accettato");
   ok(L.validateCode("mario rossi"),"spazi accettati");
-  ok(L.validateCode("a"),"1 carattere accettato");
-  ok(L.validateCode("x".repeat(25)),"25 caratteri accettati");
-  ok(L.validateCode("cod!ce"),"punteggiatura accettata");
   eq(L.validateCode("NP-2026-014"),null);
-  eq(L.validateCode("caso_07.b"),null);
+  const e=L.validateAnagrafica({etaAnni:"130",scolaritaAnni:"31",dataValutazione:"2099-01-01"});
+  ok(e.etaAnni&&e.scolaritaAnni&&e.dataValutazione,"fuori range non segnalato");
+  eq(Object.keys(L.validateAnagrafica({etaAnni:"",scolaritaAnni:"",dataValutazione:""})).length,0);
 });
-t("validateCode: segnala duplicati (case-insensitive) ma non se stesso",()=>{
-  const a=L.newSession("NP-01");
-  const sessions={[a.id]:a};
-  ok(L.validateCode("np-01",sessions,null),"duplicato non rilevato");
-  eq(L.validateCode("np-01",sessions,a.id),null,"la sessione vede se stessa come duplicato");
+t("validateSomm: numeri, range del test, motivo obbligatorio per non interpretabile",()=>{
+  ok(L.validateSomm("mmse",Object.assign(L.newSomm(),{grezzo:"31"})).grezzo,"31 su MMSE accettato");
+  ok(L.validateSomm("mmse",Object.assign(L.newSomm(),{grezzo:"abc"})).grezzo,"grezzo non numerico accettato");
+  ok(L.validateSomm("mmse",Object.assign(L.newSomm(),{errori:"-1"})).errori,"errori negativi accettati");
+  ok(L.validateSomm("mmse",Object.assign(L.newSomm(),{stato:"non-interpretabile"})).motivo,"NI senza motivo accettato");
+  eq(Object.keys(L.validateSomm("mmse",Object.assign(L.newSomm(),{stato:"non-interpretabile",motivo:"agitazione"}))).length,0);
+  ok(L.validateSomm("mmse",Object.assign(L.newSomm(),{stato:"completato"})).grezzo,"completata senza grezzo né classificazione accettata");
+  eq(Object.keys(L.validateSomm("mmse",Object.assign(L.newSomm(),{stato:"completato",grezzo:"27"}))).length,0);
+  eq(Object.keys(L.validateSomm("tmt-a",Object.assign(L.newSomm(),{stato:"completato",classif:"norma",tempoSec:"48"}))).length,0,"classificazione senza grezzo deve bastare");
 });
-t("validateMeta: età e scolarità fuori range, data futura",()=>{
-  const meta={etaAnni:"130",scolaritaAnni:"31",dataValutazione:"2099-01-01",esaminatore:"",lateralita:"",motivo:"",anamnesi:""};
-  const e=L.validateMeta(meta);
-  ok(e.etaAnni,"età 130 accettata");
-  ok(e.scolaritaAnni,"scolarità 31 accettata");
-  ok(e.dataValutazione,"data futura accettata");
-  eq(Object.keys(L.validateMeta({etaAnni:"75",scolaritaAnni:"8",dataValutazione:"2026-07-01"})).length,0);
-  eq(Object.keys(L.validateMeta({etaAnni:"",scolaritaAnni:"",dataValutazione:""})).length,0,"campi vuoti devono essere leciti");
-  ok(L.validateMeta({etaAnni:"70.5"}).etaAnni,"età non intera accettata");
-});
-
-/* ---- classificazione ---- */
-t("classify: profilo vuoto",()=>{
-  const s=L.newSession("QA-3");
-  const c=L.classify(s.firstLevel);
-  eq(c.valutati,0);eq(c.deficits.length,0);
-  ok(/Nessun dominio/.test(c.testo));
-});
-t("classify: separa deficit, borderline, norma, non valutati",()=>{
-  const s=L.newSession("QA-4");
-  s.firstLevel.domains.memoria.rating="deficit";
-  s.firstLevel.domains.attenzione.rating="borderline";
-  s.firstLevel.domains.linguaggio.rating="norma";
-  const c=L.classify(s.firstLevel);
-  eq(c.deficits,["memoria"]);
-  eq(c.borderlines,["attenzione"]);
-  eq(c.norma,["linguaggio"]);
-  eq(c.valutati,3);
-  eq(c.nonValutati.length,5);
-  ok(c.warnings.some(w=>/non ancora valutati/i.test(w)),"manca avviso di valutazione parziale");
-});
-t("classify: avvertenza con orientamento deficitario",()=>{
-  const s=L.newSession("QA-5");
-  s.firstLevel.domains.orientamento.rating="deficit";
-  ok(L.classify(s.firstLevel).warnings.some(w=>/cautela/i.test(w)));
-});
-t("classify: hash cambia al cambiare dei giudizi",()=>{
-  const s=L.newSession("QA-6");
-  const h1=L.classify(s.firstLevel).hash;
-  s.firstLevel.domains.memoria.rating="deficit";
-  ok(h1!==L.classify(s.firstLevel).hash);
+t("validitaInterferenze: distingue interferenti e da segnalare",()=>{
+  const r=L.validitaInterferenze({vista:3,udito:2,dolore:1});
+  eq(r.interferenti.length,1);eq(r.daSegnalare.length,1);
+  eq(L.validitaInterferenze({}).interferenti.length,0);
 });
 
-/* ---- selezione adattiva ---- */
-t("proposeModules: nessuna proposta se tutto nella norma",()=>{
-  const s=L.newSession("QA-7");
-  L.DOMAINS.forEach(d=>s.firstLevel.domains[d.id].rating="norma");
-  eq(L.proposeModules(L.classify(s.firstLevel)).length,0);
+/* ---------- motore di scoring ---------- */
+t("scoring: senza pacchetto, messaggio esatto richiesto",()=>{
+  const r=L.scoreTest("mmse",{grezzo:"25",etaAnni:"74",scolaritaAnni:"8"},[]);
+  eq(r.disponibile,false);
+  eq(r.messaggio,"Norme non integrate. Inserire manualmente il punteggio corretto o configurare una fonte normativa validata.");
 });
-t("proposeModules: deficit di memoria propone i moduli di memoria con priorità alta",()=>{
-  const s=L.newSession("QA-8");
-  s.firstLevel.domains.memoria.rating="deficit";
-  const p=L.proposeModules(L.classify(s.firstLevel));
-  const ids=p.map(x=>x.id);
-  ok(ids.includes("mem-verbale"),"manca memoria verbale");
-  ok(ids.includes("mem-visiva"),"manca memoria visiva");
-  eq(p.find(x=>x.id==="mem-verbale").priorita,"alta");
-  ok(p.every(x=>x.motivi.length>0),"proposte senza motivazione");
+/* pacchetto FITTIZIO usato SOLO nei test automatici, mai nell'app */
+const packFinto={app:"neuroscreen-norme",formato:1,test:"mmse",
+  fonte:"Fonte fittizia di collaudo (QA)",versione:"test",richiede:["eta","scolarita"],
+  correzioni:[{etaMin:70,etaMax:79,scolMin:6,scolMax:10,aggiustamento:1.5},
+              {etaMin:60,etaMax:69,scolMin:6,scolMax:10,aggiustamento:0.5}],
+  classi:[{min:0,max:10,etichetta:"classe A (fittizia)"},{min:10.01,max:40,etichetta:"classe B (fittizia)"}]};
+t("scoring: pacchetto valido applicato con fonte citata e avvisi",()=>{
+  eq(L.validateNormPack(packFinto),null);
+  const r=L.scoreTest("mmse",{grezzo:"25",etaAnni:"74",scolaritaAnni:"8"},[packFinto]);
+  eq(r.disponibile,true);
+  eq(r.corretto,26.5);
+  eq(r.classe,"classe B (fittizia)");
+  ok(r.fonte.includes("fittizia"));
+  ok(r.avvisi.length>=1,"nessun avviso sui limiti");
 });
-t("proposeModules: borderline produce priorità media",()=>{
-  const s=L.newSession("QA-9");
-  s.firstLevel.domains.linguaggio.rating="borderline";
-  const p=L.proposeModules(L.classify(s.firstLevel));
-  eq(p.find(x=>x.id==="ling-denominazione").priorita,"media");
+t("scoring: combinazione non coperta e dati mancanti gestiti",()=>{
+  const fuori=L.scoreTest("mmse",{grezzo:"25",etaAnni:"90",scolaritaAnni:"8"},[packFinto]);
+  eq(fuori.disponibile,false);
+  ok(/non copre/.test(fuori.messaggio));
+  const senzaEta=L.scoreTest("mmse",{grezzo:"25",etaAnni:"",scolaritaAnni:"8"},[packFinto]);
+  eq(senzaEta.disponibile,false);
+  ok(/Età mancante/.test(senzaEta.messaggio));
+  const senzaGrezzo=L.scoreTest("mmse",{grezzo:"",etaAnni:"74",scolaritaAnni:"8"},[packFinto]);
+  eq(senzaGrezzo.disponibile,false);
 });
-t("proposeModules: moduli multi-dominio sommano gli indizi",()=>{
-  const s=L.newSession("QA-10");
-  s.firstLevel.domains.attenzione.rating="borderline";
-  s.firstLevel.domains.esecutive.rating="borderline";
-  const p=L.proposeModules(L.classify(s.firstLevel));
-  const ml=p.find(x=>x.id==="mem-lavoro");
-  ok(ml,"memoria di lavoro non proposta");
-  eq(ml.priorita,"alta","due borderline convergenti devono dare priorità alta");
-  eq(ml.motivi.length,2);
-});
-t("proposeModules: con >=2 deficit propone le autonomie funzionali",()=>{
-  const s=L.newSession("QA-11");
-  s.firstLevel.domains.memoria.rating="deficit";
-  s.firstLevel.domains.esecutive.rating="deficit";
-  const p=L.proposeModules(L.classify(s.firstLevel));
-  ok(p.some(x=>x.id==="autonomie"));
-  const s2=L.newSession("QA-11b");
-  s2.firstLevel.domains.memoria.rating="deficit";
-  ok(!L.proposeModules(L.classify(s2.firstLevel)).some(x=>x.id==="autonomie"),"autonomie proposte con un solo deficit");
-});
-t("proposeModules: ordinate per punteggio decrescente",()=>{
-  const s=L.newSession("QA-12");
-  s.firstLevel.domains.memoria.rating="deficit";
-  s.firstLevel.domains.linguaggio.rating="borderline";
-  const p=L.proposeModules(L.classify(s.firstLevel));
-  for(let i=1;i<p.length;i++)ok(p[i-1].score>=p[i].score,"ordine errato");
+t("scoring: pacchetti non validi rifiutati (senza fonte, formato errato, test ignoto)",()=>{
+  ok(L.validateNormPack(null));
+  ok(L.validateNormPack({app:"altro"}));
+  ok(L.validateNormPack(Object.assign({},packFinto,{fonte:""})),"pacchetto senza fonte accettato");
+  ok(L.validateNormPack(Object.assign({},packFinto,{formato:2})));
+  ok(L.validateNormPack(Object.assign({},packFinto,{test:"inesistente"})));
+  ok(L.validateNormPack(Object.assign({},packFinto,{correzioni:[{etaMin:1}]})));
 });
 
-/* ---- fusione decisioni del clinico ---- */
-t("mergeSecondLevel: conserva esclusioni ed esiti sulle proposte confermate",()=>{
-  const s=L.newSession("QA-13");
-  s.firstLevel.domains.memoria.rating="deficit";
-  const p1=L.proposeModules(L.classify(s.firstLevel));
+/* ---------- profilo per domini ---------- */
+function sessioneProve(){
+  const s=L.newSession("QA-P");
+  s.batteria=["lista-appr","lista-diff","lista-ric","tmt-a","denominazione","fluenza-fon","fluenza-sem","adl"];
+  const set=(id,vals)=>{s.somministrazioni[id]=Object.assign(L.newSomm(),vals);};
+  set("lista-appr",{stato:"completato",grezzo:"28",classif:"deficit",intrusioni:"2"});
+  set("lista-diff",{stato:"completato",grezzo:"2",classif:"deficit"});
+  set("lista-ric",{stato:"completato",grezzo:"13",classif:"norma"});
+  set("tmt-a",{stato:"completato",grezzo:"52",tempoSec:"52",classif:"norma"});
+  set("denominazione",{stato:"completato",grezzo:"48",classif:"norma"});
+  set("fluenza-fon",{stato:"completato",grezzo:"18",classif:"deficit",perseverazioni:"3"});
+  set("fluenza-sem",{stato:"non-interpretabile",motivo:"interruzione della prova"});
+  set("adl",{stato:"completato",grezzo:"4",classif:"deficit"});
+  return s;
+}
+t("profilo: giudizio = caso peggiore, mai media; incoerenza rilevata",()=>{
+  const s=sessioneProve();
+  const p=L.domainProfile(s);
+  eq(p["mem-verbale"].giudizio,"deficit");
+  ok(p["mem-verbale"].incoerente,"deficit+norma nello stesso dominio non segnalato come incoerente");
+  eq(p["velocita"].giudizio,"norma");
+  eq(p["autonomia"].giudizio,"deficit");
+  eq(p["mem-visiva"].inBatteria.length,0);
+});
+t("profilo: affidabilità considera numero prove, incoerenze e interferenze",()=>{
+  const s=sessioneProve();
+  const p1=L.domainProfile(s);
+  ok(p1["mem-verbale"].affidabilita!=="alta","incoerente ma affidabilità alta");
+  eq(p1["velocita"].affidabilita,"media","una sola prova completata deve dare affidabilità media");
+  s.validita.valori={vista:3,vigilanza:3};
+  const p2=L.domainProfile(s);
+  ok(p2["velocita"].affidabilita==="bassa","due fattori interferenti devono abbassare l'affidabilità");
+});
+t("profilo: override del clinico prevale e viene marcato",()=>{
+  const s=sessioneProve();
+  s.profilo.override["velocita"]={giudizio:"borderline",nota:"rallentamento ai limiti"};
+  const p=L.domainProfile(s);
+  eq(p["velocita"].giudizio,"borderline");
+  ok(p["velocita"].override);
+  ok(L.profileHash(s)!==L.profileHash(L.newSession("x")),"hash insensibile ai giudizi");
+});
+t("profilo: prove non interpretabili e non eseguite conteggiate, non classificate",()=>{
+  const s=L.newSession("QA-NI");
+  s.batteria=["mmse","tmt-a"];
+  s.somministrazioni["mmse"]=Object.assign(L.newSomm(),{stato:"non-interpretabile",motivo:"rifiuto"});
+  s.somministrazioni["tmt-a"]=Object.assign(L.newSomm(),{stato:"non-eseguito"});
+  const p=L.domainProfile(s);
+  eq(p["screening"].giudizio,"na");
+  eq(p["screening"].nonInterpretabili,1);
+  eq(p["velocita"].nonEseguite,1);
+});
+
+/* ---------- selezione adattiva ---------- */
+t("adattivo: richiamo giù + riconoscimento conservato → strategie di recupero",()=>{
+  const s=sessioneProve();
+  const pr=L.proposeModules(s);
+  const ids=pr.map(x=>x.id);
+  ok(ids.includes("strategie-recupero"),"manca strategie-recupero");
+  const sr=pr.find(x=>x.id==="strategie-recupero");
+  ok(sr.motivi.some(m=>/riconoscimento/.test(m)),"motivazione non esplicita");
+});
+t("adattivo: fluenze giù + denominazione ok → esecutivo; perseverazioni motivate",()=>{
+  const s=sessioneProve();
+  const pr=L.proposeModules(s);
+  const ex=pr.find(x=>x.id==="esecutivo");
+  ok(ex,"manca modulo esecutivo");
+  ok(ex.motivi.some(m=>/denominazione conservata/.test(m)));
+  ok(ex.motivi.some(m=>/[Pp]erseverazioni/.test(m)));
+});
+t("adattivo: autonomia ridotta → funzionale-caregiver; amnestico da deficit mnesici",()=>{
+  const s=sessioneProve();
+  const pr=L.proposeModules(s);
+  ok(pr.some(x=>x.id==="funzionale-caregiver"));
+  const am=pr.find(x=>x.id==="amnestico");
+  ok(am&&am.priorita==="alta");
+});
+t("adattivo: incoerenza interna → modulo di validità",()=>{
+  const s=sessioneProve();
+  ok(L.proposeModules(s).some(x=>x.id==="validita"),"incoerenza non intercettata");
+});
+t("adattivo: profilo nei limiti → nessuna proposta",()=>{
+  const s=L.newSession("QA-OK");
+  s.batteria=["mmse","tmt-a"];
+  s.somministrazioni["mmse"]=Object.assign(L.newSomm(),{stato:"completato",grezzo:"29",classif:"norma"});
+  s.somministrazioni["tmt-a"]=Object.assign(L.newSomm(),{stato:"completato",grezzo:"40",classif:"norma"});
+  eq(L.proposeModules(s).length,0);
+});
+t("adattivo: sospetto clinico citato nelle motivazioni, senza generare proposte da solo",()=>{
+  const s=sessioneProve();
+  s.quesito.sospettoDiagnostico="sospetto disturbo neurocognitivo (esempio)";
+  const pr=L.proposeModules(s);
+  ok(pr.every(x=>x.motivi.some(m=>/sospetto clinico/.test(m))));
+  const s2=L.newSession("QA-S");
+  s2.quesito.sospettoDiagnostico="qualunque";
+  eq(L.proposeModules(s2).length,0,"il solo sospetto non deve generare proposte");
+});
+t("merge secondo livello: conserva decisioni, manuali e voci compilate non più proposte",()=>{
+  const s=sessioneProve();
+  const p1=L.proposeModules(s);
   let items=L.mergeSecondLevel({items:[]},p1);
-  items.find(i=>i.id==="mem-visiva").incluso=false;
-  items.find(i=>i.id==="mem-verbale").esito="deficit";
-  items.find(i=>i.id==="mem-verbale").note="rievocazione differita carente";
+  items.find(i=>i.id==="amnestico").esito="deficit";
+  items.find(i=>i.id==="validita").incluso=false;
+  items.push({id:"umore",origine:"manuale",priorita:"media",motivi:[],incluso:true,esito:"na",strumento:"",note:""});
   const items2=L.mergeSecondLevel({items},p1);
-  eq(items2.find(i=>i.id==="mem-visiva").incluso,false,"esclusione persa");
-  eq(items2.find(i=>i.id==="mem-verbale").esito,"deficit","esito perso");
-  eq(items2.find(i=>i.id==="mem-verbale").note,"rievocazione differita carente","nota persa");
-});
-t("mergeSecondLevel: conserva i moduli aggiunti a mano",()=>{
-  const s=L.newSession("QA-14");
-  s.firstLevel.domains.memoria.rating="deficit";
-  const p=L.proposeModules(L.classify(s.firstLevel));
-  const items=L.mergeSecondLevel({items:[{id:"umore-colloquio",origine:"manuale",priorita:"media",motivi:[],incluso:true,esito:"na",strumento:"",note:""}]},p);
-  ok(items.some(i=>i.id==="umore-colloquio"&&i.origine==="manuale"));
-});
-t("mergeSecondLevel: modulo compilato non più proposto resta segnalato; quello intatto sparisce",()=>{
-  const s=L.newSession("QA-15");
-  s.firstLevel.domains.memoria.rating="deficit";
-  const p1=L.proposeModules(L.classify(s.firstLevel));
-  let items=L.mergeSecondLevel({items:[]},p1);
-  items.find(i=>i.id==="mem-verbale").esito="borderline";
-  items.find(i=>i.id==="mem-visiva").incluso=false; // non toccato in altro modo
-  // il primo livello torna nella norma → nessuna proposta
-  s.firstLevel.domains.memoria.rating="norma";
-  const p2=L.proposeModules(L.classify(s.firstLevel));
-  const items2=L.mergeSecondLevel({items},p2);
-  const verb=items2.find(i=>i.id==="mem-verbale");
-  ok(verb,"modulo con esito compilato è sparito");
-  eq(verb.origine,"proposta-precedente");
-  ok(!items2.some(i=>i.id==="mem-visiva"),"modulo escluso e mai compilato doveva sparire");
+  eq(items2.find(i=>i.id==="amnestico").esito,"deficit");
+  eq(items2.find(i=>i.id==="validita").incluso,false);
+  ok(items2.some(i=>i.id==="umore"&&i.origine==="manuale"));
+  const items3=L.mergeSecondLevel({items:items2},[]);
+  ok(items3.some(i=>i.id==="amnestico"&&i.origine==="proposta-precedente"),"voce compilata persa");
+  ok(!items3.some(i=>i.id==="validita"),"voce esclusa e non compilata doveva sparire");
 });
 
-/* ---- referto ---- */
-t("buildReport: contiene intestazione, sezioni e avvertenza non diagnostica",()=>{
-  const s=L.newSession("QA-16");
-  s.meta.etaAnni="74";s.meta.scolaritaAnni="8";s.meta.motivo="Riferite difficoltà di memoria.";
-  s.firstLevel.domains.memoria.rating="deficit";
-  s.firstLevel.domains.memoria.strumento="test di screening scelto dal clinico";
-  s.firstLevel.domains.memoria.punteggio="12";
-  const r=L.buildReport(s);
-  ["BOZZA DI REFERTO","Codice pseudonimo: QA-16","PRIMO LIVELLO","CLASSIFICAZIONE PRELIMINARE","SECONDO LIVELLO","CONCLUSIONI","Non costituisce diagnosi"]
-    .forEach(x=>ok(r.includes(x),"manca: "+x));
-  ok(r.includes("punteggio grezzo: 12"));
-  ok(r.includes("[da completare a cura del clinico]"),"conclusioni vuote non segnalate");
+/* ---------- referto ---------- */
+t("referto: tutte le sezioni previste presenti",()=>{
+  const s=sessioneProve();
+  const r=L.buildReport(s,[]);
+  ["1. DATI ESSENZIALI","2. QUESITO CLINICO","3. ANAMNESI","4. COMPORTAMENTO","5. CONDIZIONI DI VALIDITÀ",
+   "6. PROVE SOMMINISTRATE","7. RISULTATI PER DOMINIO","8. OSSERVAZIONI QUALITATIVE","9. SINTESI DEL PROFILO",
+   "10. CONFRONTO","11. LIMITI","12. CONCLUSIONI","13. INDICAZIONI","14. FOLLOW-UP","Firma del professionista"]
+    .forEach(x=>ok(r.includes(x),"manca sezione: "+x));
+  ok(r.includes("Non costituisce diagnosi"));
 });
-t("buildReport: include esiti del secondo livello solo per moduli inclusi",()=>{
-  const s=L.newSession("QA-17");
-  s.firstLevel.domains.memoria.rating="deficit";
-  const items=L.mergeSecondLevel({items:[]},L.proposeModules(L.classify(s.firstLevel)));
-  items.find(i=>i.id==="mem-verbale").esito="deficit";
-  items.find(i=>i.id==="mem-visiva").incluso=false;
-  s.secondLevel.items=items;
-  const r=L.buildReport(s);
-  ok(r.includes("Memoria episodica verbale: deficit"));
-  ok(!r.includes("Memoria episodica visuo-spaziale"),"modulo escluso finito nel referto");
+t("referto: tabella risultati con stati e frasi qualitative da regole",()=>{
+  const s=sessioneProve();
+  const r=L.buildReport(s,[]);
+  ok(r.includes("non interpretabile"),"stato NI assente dalla tabella");
+  ok(r.includes("Ridotta acquisizione"),"frase su acquisizione mancante");
+  ok(r.includes("beneficio relativo dal riconoscimento"),"frase richiamo/riconoscimento mancante");
+  ok(r.includes("intrusioni"),"intrusioni non riportate");
+  ok(r.includes("perseverazioni"),"perseverazioni non riportate");
+  ok(r.includes("interruzione della prova"),"motivo NI non riportato");
 });
-t("fmtDateIT",()=>{
+t("referto: niente termini diagnostici automatici",()=>{
+  const s=sessioneProve();
+  const r=L.buildReport(s,[]);
+  ok(!/diagnosi di|demenza|alzheimer|\bMCI\b|deterioramento cognitivo lieve/i.test(r),"termini diagnostici nel referto automatico");
+});
+t("referto: punteggio del motore riportato con asterisco e fonte quando disponibile",()=>{
+  const s=L.newSession("QA-N");
+  s.anagrafica.etaAnni="74";s.anagrafica.scolaritaAnni="8";
+  s.batteria=["mmse"];
+  s.somministrazioni["mmse"]=Object.assign(L.newSomm(),{stato:"completato",grezzo:"25",classif:"borderline"});
+  const r=L.buildReport(s,[packFinto]);
+  ok(r.includes("26.5*"),"corretto calcolato assente");
+  ok(r.includes("fonte normativa importata"),"nota sull'asterisco assente");
+});
+t("fmtSec e fmtDateIT",()=>{
+  eq(L.fmtSec("52"),"52″");eq(L.fmtSec("90"),"1′30″");eq(L.fmtSec(""),"");
   eq(L.fmtDateIT("2026-07-12"),"12/07/2026");
-  eq(L.fmtDateIT(""),"");
 });
 
-/* ---- import/export ---- */
-t("export→import: giro completo senza perdite",()=>{
-  const s=L.newSession("QA-18");
-  s.meta.etaAnni="80";
-  s.firstLevel.domains.attenzione.rating="borderline";
-  s.classification.notaClinico="nota di prova";
-  const payload=L.exportPayload({[s.id]:s});
-  const res=L.parseImport(JSON.stringify(payload));
+/* ---------- import/export e migrazione ---------- */
+t("export→import (formato 2): giro completo senza perdite",()=>{
+  const s=sessioneProve();
+  s.validita.valori={vista:3};
+  s.profilo.override["velocita"]={giudizio:"borderline",nota:"x"};
+  s.referto.versioni.push({n:1,testo:"bozza v1",salvatoAt:L.nowISO()});
+  const res=L.parseImport(JSON.stringify(L.exportPayload({[s.id]:s})));
   ok(res.ok,res.errore);
-  eq(res.sessions.length,1);
-  eq(res.sessions[0].code,"QA-18");
-  eq(res.sessions[0].meta.etaAnni,"80");
-  eq(res.sessions[0].firstLevel.domains.attenzione.rating,"borderline");
-  eq(res.sessions[0].classification.notaClinico,"nota di prova");
+  const r=res.sessions[0];
+  eq(r.batteria.length,8);
+  eq(r.somministrazioni["lista-appr"].classif,"deficit");
+  eq(r.somministrazioni["fluenza-sem"].stato,"non-interpretabile");
+  eq(r.validita.valori.vista,3);
+  eq(r.profilo.override["velocita"].giudizio,"borderline");
+  eq(r.referto.versioni.length,1);
 });
-t("parseImport: rifiuta JSON rotto, file estranei, formati futuri",()=>{
-  ok(!L.parseImport("{non json").ok);
-  ok(!L.parseImport('{"a":1}').ok);
-  ok(!L.parseImport(JSON.stringify({app:"neuroscreen-clinico",formato:99,sessioni:[]})).ok);
-  ok(!L.parseImport(JSON.stringify({app:"neuroscreen-clinico",formato:1,sessioni:[{niente:"code"}]})).ok);
-});
-t("sanitizeSession: scarta valori corrotti mantenendo il resto",()=>{
-  const raw={code:"QA-19",firstLevel:{domains:{memoria:{rating:"INVENTATO",note:"ok"},attenzione:{rating:"deficit"}}},
-    secondLevel:{items:[{id:"mem-verbale",esito:"boh",incluso:1},null,"x"]}};
+t("import: rifiuta file estranei e ripulisce valori corrotti",()=>{
+  ok(!L.parseImport("{x").ok);
+  ok(!L.parseImport('{"app":"altro","sessioni":[]}').ok);
+  const raw={code:"QA-C",schema:2,batteria:["mmse","inesistente"],
+    somministrazioni:{mmse:{stato:"INVENTATO",classif:"boh",grezzo:"27"}},
+    validita:{valori:{vista:99}},
+    secondLevel:{items:[{id:"amnestico",esito:"x",incluso:1},{id:"ignoto"}]}};
   const s=L.sanitizeSession(raw);
-  eq(s.firstLevel.domains.memoria.rating,"na","rating inventato non azzerato");
-  eq(s.firstLevel.domains.memoria.note,"ok");
-  eq(s.firstLevel.domains.attenzione.rating,"deficit");
+  eq(s.batteria,["mmse"]);
+  eq(s.somministrazioni["mmse"].stato,"da-fare");
+  eq(s.somministrazioni["mmse"].classif,"na");
+  eq(s.somministrazioni["mmse"].grezzo,"27");
+  eq(s.validita.valori.vista,undefined);
   eq(s.secondLevel.items.length,1);
   eq(s.secondLevel.items[0].esito,"na");
-  eq(s.secondLevel.items[0].incluso,true);
 });
-t("sanitizeSession: rifiuta oggetti senza codice",()=>{
-  eq(L.sanitizeSession({}),null);
-  eq(L.sanitizeSession(null),null);
+t("migrazione dal vecchio formato (v1→v2): giudizi conservati come override",()=>{
+  const vecchia={id:"sold1",code:"NP-OLD",createdAt:"2026-07-01T00:00:00Z",updatedAt:"2026-07-01T00:00:00Z",
+    meta:{dataValutazione:"2026-07-01",esaminatore:"Dott. X",etaAnni:"80",scolaritaAnni:"5",lateralita:"destrimane",motivo:"controllo",anamnesi:"nota"},
+    firstLevel:{domains:{memoria:{rating:"deficit",strumento:"",punteggio:"",note:"richiamo povero"},attenzione:{rating:"norma",strumento:"",punteggio:"",note:""},orientamento:{rating:"na"}},osservazioni:"collaborante"},
+    classification:{confermataAt:"2026-07-01T00:00:00Z",basata:"x",notaClinico:""},
+    secondLevel:{basata:"",items:[]},
+    report:{conclusioni:"vecchie conclusioni",testoManuale:"",modificatoAt:null}};
+  const s=L.sanitizeSession(vecchia);
+  ok(s,"migrazione fallita");
+  eq(s.schema,2);
+  eq(s.code,"NP-OLD");
+  eq(s.anagrafica.etaAnni,"80");
+  eq(s.quesito.quesitoClinico,"controllo");
+  eq(s.profilo.override["mem-verbale"].giudizio,"deficit");
+  ok(!s.profilo.override["attenzione"]||s.profilo.override["attenzione"].giudizio!=="deficit");
+  eq(s.osservazioni,"collaborante");
+  eq(s.referto.conclusioni,"vecchie conclusioni");
+  const res=L.parseImport(JSON.stringify({app:"neuroscreen-clinico",formato:1,sessioni:[vecchia]}));
+  ok(res.ok,"import formato 1 rifiutato");
+});
+t("sessione demo: dichiaratamente fittizia e coerente col catalogo",()=>{
+  const s=L.demoSession();
+  ok(/fittizi/i.test(s.quesito.quesitoClinico)||/dimostrativ/i.test(s.quesito.quesitoClinico));
+  s.batteria.forEach(id=>ok(L.TEST_BY_ID[id],"test inesistente in demo: "+id));
+  Object.keys(s.somministrazioni).forEach(id=>{
+    eq(Object.keys(L.validateSomm(id,s.somministrazioni[id])).length,0,"dati demo non validi per "+id);
+  });
+  ok(L.proposeModules(s).length>0,"la demo dovrebbe generare proposte");
 });
 
-/* ---- vincoli sull'interfaccia (controlli statici sull'HTML) ---- */
-t("HTML: nessun riferimento a risorse esterne (app locale e offline)",()=>{
-  ok(!/\bsrc\s*=\s*["']https?:/i.test(html),"trovato src esterno");
-  ok(!/\bhref\s*=\s*["']https?:/i.test(html),"trovato href esterno");
-  ok(!/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon/i.test(html),"trovata chiamata di rete");
+/* ---------- vincoli sull'HTML ---------- */
+t("HTML: nessuna risorsa esterna, nessuna chiamata di rete",()=>{
+  ok(!/\bsrc\s*=\s*["']https?:/i.test(html));
+  ok(!/\bhref\s*=\s*["']https?:/i.test(html));
+  ok(!/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon/i.test(html));
 });
-t("HTML: disclaimer non diagnostico e invito alla pseudonimizzazione presenti",()=>{
-  ok(/non produce diagnosi/i.test(html));
+t("HTML: avviso versione dimostrativa e pseudonimizzazione presenti",()=>{
+  ok(/non autorizzata per uso clinico reale/i.test(html));
   ok(/codice pseudonimo/i.test(html));
+  ok(/cancella tutti i dati/i.test(html.toLowerCase().replace(/\s+/g," "))||/wipe-all/.test(html));
 });
-t("HTML: viewport mobile e input da 16px (anti-zoom iOS)",()=>{
+t("HTML: viewport mobile, input 16px, PWA collegata",()=>{
   ok(/name="viewport"/.test(html));
   ok(/font-size:\s*16px/.test(html));
+  ok(/rel="manifest"/.test(html));
+  ok(/serviceWorker/.test(html)&&/location\.protocol/.test(html));
 });
-
-/* ---- PWA (pubblicazione su GitHub Pages) ---- */
-t("PWA: manifest valido e coerente con le icone presenti",()=>{
+t("PWA: manifest e service worker coerenti",()=>{
   const man=JSON.parse(fs.readFileSync(path.join(__dirname,"manifest.json"),"utf8"));
-  eq(man.name,"NeuroScreen Clinico");
-  eq(man.display,"standalone");
-  ok(Array.isArray(man.icons)&&man.icons.length===2);
   man.icons.forEach(i=>ok(fs.existsSync(path.join(__dirname,i.src)),"icona mancante: "+i.src));
-  ok(/name="manifest"|rel="manifest"/.test(html),"index.html non collega il manifest");
-});
-t("PWA: service worker rete-prima con no-store e fallback (mai cache-prima per la pagina)",()=>{
   const sw=fs.readFileSync(path.join(__dirname,"sw.js"),"utf8");
-  ok(sw.includes('cache:"no-store"'),"manca cache:no-store");
-  ok(/timeout/.test(sw),"manca il limite di attesa");
-  ok(/cache\.match\("index\.html"\)/.test(sw),"manca il fallback alla versione salvata");
-  new Function(sw.replace(/^"use strict";/,"")); // solo verifica di sintassi
-});
-t("PWA: registrazione solo su http(s), mai da file locale",()=>{
-  ok(/serviceWorker/.test(html));
-  ok(/https\?:\$?/.test(html)||/location\.protocol/.test(html),"manca il controllo sul protocollo");
+  ok(sw.includes('cache:"no-store"'));
+  ok(/cache\.match\("index\.html"\)/.test(sw));
+  ok(/"index\.html"/.test(sw.match(/STATICI=\[[^\]]*\]/)[0]),"index.html non precaricata dal service worker");
 });
 
 console.log("");
