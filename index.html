@@ -130,6 +130,11 @@ table.mini th{background:var(--na-bg);font-weight:600}
 .mod-reasons{color:var(--muted);font-size:.85rem;margin:.15rem 0 0}
 /* report */
 #reportText{min-height:24rem;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;line-height:1.45}
+.report-preview{border:1px solid var(--line);border-radius:10px;padding:1rem;margin:.8rem 0;background:#fff}
+.report-preview .report-head{display:flex;justify-content:space-between;gap:1rem;border-bottom:2px solid var(--brand);padding-bottom:.6rem;margin-bottom:.8rem;flex-wrap:wrap}
+.report-preview table{width:100%;border-collapse:collapse;font-size:.82rem}
+.report-preview th,.report-preview td{border:1px solid var(--line);padding:.35rem .45rem;text-align:left;vertical-align:top}
+.report-preview th{background:var(--na-bg)}
 /* footer */
 .disclaimer{max-width:980px;margin:0 auto;padding:0 1rem 2rem;color:var(--muted);font-size:.8rem}
 /* toasts */
@@ -141,7 +146,11 @@ table.mini th{background:var(--na-bg);font-weight:600}
 @media print{
   body{background:#fff}
   .no-print,.topbar,.stepper,main,.disclaimer,#toasts{display:none !important}
-  .print-only{display:block;white-space:pre-wrap;font:11pt/1.4 Georgia,serif;color:#000;padding:0}
+  .print-only{display:block;font:10.5pt/1.4 Georgia,serif;color:#000;padding:0}
+  .print-only .report-head{display:flex;justify-content:space-between;border-bottom:2px solid #222;margin-bottom:10mm;padding-bottom:3mm}
+  .print-only table{width:100%;border-collapse:collapse;font-size:9pt;margin:4mm 0 7mm}
+  .print-only th,.print-only td{border:1px solid #555;padding:2mm;text-align:left;vertical-align:top}
+  .print-only th{background:#eee}.print-only .narrativa{white-space:pre-wrap}.print-only h2{font-size:14pt}
 }
 </style>
 </head>
@@ -182,7 +191,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v8";
+const APPV="v9";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -1360,6 +1369,13 @@ function viewHome(){
     ${nMateriali?'<button data-action="clear-materials" class="danger">Rimuovi tutti i materiali</button>':""}</div>
   </div>
   <div class="card">
+    <h3>Licenze e costi</h3>
+    <p class="muted small">Catalogo: 55 voci. Tre strumenti aperti già completi; ACE-III e M-ACE
+    risultano gratuiti per uso clinico secondo la fonte ufficiale. L’acquisto minimo verificato per
+    MMSE-2, SDMT e Token Test è stimato in <strong>719 USD</strong>, esclusi imposte, spedizione e protocolli successivi.</p>
+    <a href="LICENZE.md" target="_blank" rel="noopener">Apri il prospetto completo delle licenze</a>
+  </div>
+  <div class="card">
     <h3>Copia di sicurezza e privacy</h3>
     <p class="muted small">I dati vivono solo nel browser di questo dispositivo: esportarli
     regolarmente in un file JSON. La cancellazione totale è definitiva.</p>
@@ -1777,6 +1793,24 @@ function viewConfronto(){
   </div>`;
 }
 
+function reportScoresHTML(s,normPacks){
+  const rows=(s.batteria||[]).map(tid=>{
+    const t=TEST_BY_ID[tid],e=s.somministrazioni[tid]||newSomm();let corr=e.corretto||"";
+    if(!corr&&e.stato==="completato"){
+      const sc=scoreTest(tid,{grezzo:e.grezzo,etaAnni:s.anagrafica.etaAnni,scolaritaAnni:s.anagrafica.scolaritaAnni,sesso:s.anagrafica.sesso},normPacks||[]);
+      if(sc.disponibile)corr=String(sc.corretto)+"*";
+    }
+    const stato={completato:"Completata","da-fare":"Non somministrata","non-eseguito":"Non eseguita","non-interpretabile":"Non interpretabile"}[e.stato]||e.stato;
+    return `<tr><td><strong>${esc(t?t.sigla:tid)}</strong><br><span class="muted">${esc(t?t.nome:tid)}</span></td><td>${esc(stato)}</td><td>${esc(e.grezzo||"—")}</td><td>${esc(corr||"—")}</td><td>${e.classif!=="na"?esc(RATING_LABEL[e.classif]):"—"}</td><td>${esc(fmtSec(e.tempoSec)||"—")}</td><td>${esc(e.errori||"—")}</td></tr>`;
+  }).join("");
+  return `<div class="tbl-wrap"><table><thead><tr><th>Prova</th><th>Stato</th><th>Grezzo</th><th>Corretto</th><th>Classificazione</th><th>Tempo</th><th>Errori</th></tr></thead><tbody>${rows||'<tr><td colspan="7">Nessuna prova registrata.</td></tr>'}</tbody></table></div>`;
+}
+function reportFormattedHTML(s,testo){
+  return `<div class="report-head"><div><h2>Referto neuropsicologico</h2><strong>Codice: ${esc(s.code)}</strong></div><div>Data: ${esc(fmtDateIT(s.anagrafica.dataValutazione))}<br>Esaminatore: ${esc(s.anagrafica.esaminatore||"________________")}</div></div>
+    <h3>Risultati delle prove</h3>${reportScoresHTML(s,state.normPacks)}
+    <h3 style="margin-top:1rem">Sintesi clinica</h3><div class="narrativa">${esc(testo)}</div>`;
+}
+
 function viewReferto(){
   const s=cur();
   const testo=s.referto.testoManuale||buildReport(s,state.normPacks,state.sessions);
@@ -1800,6 +1834,8 @@ function viewReferto(){
     ${manuale?'<div class="banner warn">Il testo qui sotto è stato modificato a mano: non si aggiorna più da solo. "Rigenera dai dati" lo ricostruisce (le modifiche manuali al testo andranno perse).</div>':""}
     <label for="reportText">Testo della bozza</label>
     <textarea id="reportText" data-report-edit spellcheck="false">${esc(testo)}</textarea>
+    <h4 style="margin-top:1rem">Anteprima impaginata</h4>
+    <div class="report-preview">${reportFormattedHTML(s,testo)}</div>
     <div class="btnrow">
       <button data-action="regen-report">Rigenera dai dati</button>
       <button data-action="save-version">Salva come versione (v${versioni.length+1})</button>
@@ -2009,7 +2045,7 @@ const ACTIONS={
     }
   },
   "print-report":()=>{
-    $("#printArea").textContent=$("#reportText").value;
+    $("#printArea").innerHTML=reportFormattedHTML(cur(),$("#reportText").value);
     window.print();
   }
 };

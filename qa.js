@@ -518,6 +518,11 @@ t("HTML: viewport mobile, input 16px, PWA collegata",()=>{
   ok(/rel="manifest"/.test(html));
   ok(/serviceWorker/.test(html)&&/location\.protocol/.test(html));
 });
+t("referto impaginato: tabella punteggi e stampa HTML",()=>{
+  ok(/function reportScoresHTML\(/.test(html));
+  ok(/<th>Grezzo<\/th><th>Corretto<\/th>/.test(html));
+  ok(/printArea"\)\.innerHTML=reportFormattedHTML/.test(html));
+});
 t("PWA: manifest e service worker coerenti",()=>{
   const man=JSON.parse(fs.readFileSync(path.join(__dirname,"manifest.json"),"utf8"));
   man.icons.forEach(i=>ok(fs.existsSync(path.join(__dirname,i.src)),"icona mancante: "+i.src));

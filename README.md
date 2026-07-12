@@ -100,6 +100,13 @@ Esempio minimo:
 Nell’interfaccia assistito non vengono mostrate fasce interpretative o diagnosi; il medico vede
 il grezzo, la fonte e gli eventuali avvisi di sicurezza.
 
+## Referto impaginato e licenze (v9)
+
+Il referto mostra e stampa un’intestazione clinica, una tabella strutturata con stato,
+punteggio grezzo, corretto, classificazione, tempo ed errori, seguita dalla sintesi narrativa.
+Il prospetto `LICENZE.md` separa strumenti aperti, gratuiti, a pagamento e voci generiche,
+con una prima stima dei costi ufficiali verificabili.
+
 ## Motore di scoring
 
 Separato dall'interfaccia (`scoreTest`), vuoto per progetto. Le norme si aggiungono
