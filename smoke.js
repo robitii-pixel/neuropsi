@@ -108,6 +108,13 @@ const VIEWPORTS=[
     await fill("iadl","grezzo","3");await selCl("iadl","deficit");
     // messaggio norme non integrate visibile
     ok((await page.textContent("main")).includes("Norme non integrate"),"messaggio norme non integrate presente");
+    // avanzamento, apri/chiudi tutte, versione della prova
+    ok((await page.textContent("#som-progress")).includes("Registrate"),"indicatore di avanzamento presente");
+    await page.click('button[data-action="cards-close"]');
+    ok(await page.evaluate(()=>[...document.querySelectorAll("details.test-card")].every(d=>!d.open)),"chiudi tutte funziona");
+    await page.click('button[data-action="cards-open"]');
+    ok(await page.evaluate(()=>[...document.querySelectorAll("details.test-card")].every(d=>d.open)),"apri tutte funziona");
+    await fill("mmse","versioneProva","forma A");
     await page.fill("#f_oss","Collaborante. Prova.");
 
     // passo 5: profilo
@@ -151,6 +158,18 @@ const VIEWPORTS=[
     // versionamento
     await page.click('button[data-action="save-version"]');
     ok((await page.textContent("main")).includes("Versione 1"),"versione salvata ed elencata");
+    // esportazioni del referto (TXT e JSON strutturato)
+    const dTxt=page.waitForEvent("download");
+    await page.click('button[data-action="export-report-txt"]');
+    ok((await dTxt).suggestedFilename().endsWith(".txt"),"download TXT del referto");
+    const dJson=page.waitForEvent("download");
+    await page.click('button[data-action="export-report-json"]');
+    const fJson=await dJson;
+    ok(fJson.suggestedFilename().startsWith("referto-strutturato-"),"download JSON strutturato");
+    const jPath=await fJson.path();
+    const jObj=JSON.parse(fs.readFileSync(jPath,"utf8"));
+    ok(jObj.app==="neuroscreen-referto"&&Array.isArray(jObj.prove)&&jObj.prove.some(p=>p.id==="mmse"&&p.versioneProva==="forma A"),
+      "contenuto del referto strutturato coerente (con versione prova)");
 
     // persistenza: ricarica
     await page.reload();

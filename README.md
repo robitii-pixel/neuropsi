@@ -19,8 +19,10 @@ dipendenza: si apre con un doppio clic in qualunque browser moderno, anche offli
    suggerita, mai rigida), con durata stimata.
 4. **Somministrazione** — per ogni prova: stato (completata / non eseguita / non
    interpretabile con motivo), cronometro, punteggio grezzo validato sul range del
-   test, tempo, errori, autocorrezioni, intrusioni, perseverazioni, punteggio corretto,
-   classificazione del clinico, note qualitative.
+   test, tempo, errori, autocorrezioni, intrusioni, perseverazioni, versione della
+   prova, punteggio corretto, classificazione del clinico, note qualitative.
+   Indicatore di avanzamento, apertura/chiusura di tutte le schede e disposizione
+   a due colonne sugli schermi larghi (tablet in orizzontale e desktop).
 5. **Profilo per domini** (13 domini + screening) — prove disponibili/somministrate,
    qualità e coerenza del dato, fattori interferenti, sintesi descrittiva, affidabilità;
    giudizio automatico = caso peggiore tra le classificazioni del clinico (mai una
@@ -34,13 +36,16 @@ dipendenza: si apre con un doppio clic in qualunque browser moderno, anche offli
    variazioni di punteggi grezzi, tempi, errori e classificazioni per le prove
    completate in entrambe, variazioni dei giudizi di dominio (incluse autonomia,
    umore e comportamento), prove presenti in una sola valutazione, lettura clinica
-   del confronto. Sempre descrittivo: limiti espliciti su effetto pratica e assenza
+   del confronto. Se la **versione della prova** registrata differisce tra le due
+   valutazioni, il confronto viene marcato come non attendibile. Sempre descrittivo: limiti espliciti su effetto pratica e assenza
    di RCI, nessuna variazione dichiarata significativa. Il pulsante "Controllo"
    crea la valutazione di follow-up copiando batteria e dati stabili.
 8. **Referto** — 14 sezioni + firma (dati, quesito, anamnesi, comportamento, validità,
    tabella risultati, domini, osservazioni qualitative da regole descrittive, sintesi,
    confronto longitudinale, limiti, conclusioni, indicazioni, follow-up); sempre
-   modificabile, con versionamento, copia, stampa/PDF ed esportazione strutturata.
+   modificabile, con versionamento, copia, stampa/PDF, scaricamento come testo (TXT)
+   ed esportazione in **formato strutturato** (JSON documentato, `neuroscreen-referto`
+   formato 1) leggibile da gestionali e script senza interpretare testo libero.
 
 ## Catalogo test e principi
 
@@ -148,7 +153,7 @@ fonte normativa validata."* — e il punteggio corretto resta inseribile a mano.
 
 ## Controlli
 
-- `npm run check` — 46 test senza dipendenze su catalogo, modello dati, validazioni,
+- `npm run check` — 54 test senza dipendenze su catalogo, modello dati, validazioni,
   motore di scoring (incl. pacchetto fittizio di collaudo usato solo nei test),
   profilo, regole adattive, referto, import/migrazione e vincoli (nessuna risorsa
   esterna, nessun cut-off nel codice, nessun termine diagnostico nei testi generati).

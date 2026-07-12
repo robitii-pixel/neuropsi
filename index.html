@@ -94,6 +94,9 @@ details.test-card>summary::-webkit-details-marker{display:none}
 details.test-card>summary .nm{font-weight:600;flex:1;min-width:9rem}
 details.test-card .body{padding:0 .8rem .8rem;border-top:1px solid var(--line)}
 .som-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0 .7rem}
+.prog{height:8px;background:var(--na-bg);border-radius:99px;overflow:hidden}
+.prog>div{height:100%;background:var(--ok);border-radius:99px}
+@media(min-width:900px){.prove-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 .8rem;align-items:start}}
 .timer{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.4rem 0}
 .timer .disp{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.2rem;min-width:5rem;font-weight:700}
 .stato-row{display:flex;gap:.4rem;flex-wrap:wrap;margin:.4rem 0}
@@ -191,7 +194,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v11";
+const APPV="v12";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -389,7 +392,7 @@ function nowISO(){return new Date().toISOString();}
 function uid(){return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 function newSomm(){
   return {stato:"da-fare",motivo:"",grezzo:"",corretto:"",tempoSec:"",errori:"",
-    autocorrezioni:"",intrusioni:"",perseverazioni:"",classif:"na",note:"",risposte:{}};
+    autocorrezioni:"",intrusioni:"",perseverazioni:"",classif:"na",note:"",versioneProva:"",risposte:{}};
 }
 function newSession(code){
   return {
@@ -768,7 +771,9 @@ function compareSessions(prev,curr){
       tempoPrev:a.tempoSec,tempoCurr:b.tempoSec,dTempo:delta(numOrNull(a.tempoSec),numOrNull(b.tempoSec)),
       erroriPrev:a.errori,erroriCurr:b.errori,dErrori:delta(numOrNull(a.errori),numOrNull(b.errori)),
       classifPrev:a.classif,classifCurr:b.classif,
-      classifVariata:a.classif!=="na"&&b.classif!=="na"&&a.classif!==b.classif});
+      classifVariata:a.classif!=="na"&&b.classif!=="na"&&a.classif!==b.classif,
+      versionePrev:a.versioneProva||"",versioneCurr:b.versioneProva||"",
+      versioneDiversa:!!((a.versioneProva||b.versioneProva)&&(a.versioneProva||"")!==(b.versioneProva||""))});
   });
   tests.sort((x,y)=>(y.classifVariata?1:0)-(x.classifVariata?1:0));
   const soloPrev=[...dPrev].filter(tid=>!dCurr.has(tid));
@@ -798,6 +803,7 @@ function comparisonText(prev,curr){
     let riga="- "+nomi(t.tid)+": "+parti.join("; ");
     if(t.classifVariata)riga+=". Classificazione del clinico variata: da "+RATING_LABEL[t.classifPrev]+" a "+RATING_LABEL[t.classifCurr]+" (da valutare clinicamente)";
     else if(t.classifPrev!=="na")riga+=". Classificazione invariata ("+RATING_LABEL[t.classifCurr]+")";
+    if(t.versioneDiversa)riga+=". Avvertenza: versioni della prova diverse ("+(t.versionePrev||"non indicata")+" vs "+(t.versioneCurr||"non indicata")+"): confronto non attendibile";
     L.push(riga+".");
   });
   const domVar=cmp.domini.filter(d=>d.variato);
@@ -976,6 +982,55 @@ function buildReport(s,normPacks,sessions){
   return L.join("\n");
 }
 
+/* ---------- Referto in formato strutturato (per sistemi esterni) ----------
+   Esporta gli stessi contenuti del referto come JSON documentato, così un
+   gestionale o uno script possono leggerli senza interpretare testo libero. */
+function buildStructuredReport(s,normPacks,sessions){
+  const p=domainProfile(s);
+  const val=validitaInterferenze(s.validita&&s.validita.valori);
+  const prevSess=(sessions&&s.confronto&&s.confronto.withId)?sessions[s.confronto.withId]:null;
+  const prove=(s.batteria||[]).map(tid=>{
+    const t=TEST_BY_ID[tid];const e=s.somministrazioni[tid]||newSomm();
+    const sc=e.stato==="completato"?scoreTest(tid,{grezzo:e.grezzo,etaAnni:s.anagrafica.etaAnni,
+      scolaritaAnni:s.anagrafica.scolaritaAnni,sesso:s.anagrafica.sesso},normPacks):null;
+    return {id:tid,sigla:t?t.sigla:tid,nome:t?t.nome:tid,dominio:t?t.dom:"",
+      stato:e.stato,motivo:e.motivo,grezzo:e.grezzo,correttoManuale:e.corretto,
+      correttoDaFonte:(sc&&sc.disponibile)?{valore:sc.corretto,classe:sc.classe,fonte:sc.fonte,versione:sc.versione}:null,
+      classificazioneClinico:e.classif,tempoSec:e.tempoSec,errori:e.errori,
+      autocorrezioni:e.autocorrezioni,intrusioni:e.intrusioni,perseverazioni:e.perseverazioni,
+      versioneProva:e.versioneProva,note:e.note};
+  });
+  const domini=["screening"].concat(DOMS.map(d=>d.id)).filter(did=>p[did].inBatteria.length).map(did=>({
+    id:did,nome:domName(did),giudizio:p[did].giudizio,giudizioDelClinico:p[did].override,
+    affidabilita:p[did].affidabilita,sintesi:p[did].sintesi,nota:p[did].nota}));
+  return {
+    app:"neuroscreen-referto",formato:1,generatoIl:nowISO(),appVersione:APPV,
+    codiceValutazione:s.code,codicePaziente:s.anagrafica.codicePaziente||null,
+    dataValutazione:s.anagrafica.dataValutazione,esaminatore:s.anagrafica.esaminatore,
+    anagrafica:{etaAnni:s.anagrafica.etaAnni,sesso:s.anagrafica.sesso,
+      scolaritaAnni:s.anagrafica.scolaritaAnni,linguaMadre:s.anagrafica.linguaMadre,
+      professione:s.anagrafica.professione,lateralita:s.anagrafica.lateralita},
+    quesito:s.quesito,
+    validita:{interferenti:val.interferenti,daSegnalare:val.daSegnalare,
+      caregiverPresente:s.validita.caregiverPresente,note:s.validita.note},
+    comportamentoDuranteEsame:s.osservazioni,
+    prove,domini,
+    osservazioniQualitative:qualitativePhrases(s),
+    secondoLivello:(s.secondLevel.items||[]).map(it=>({id:it.id,
+      nome:MODULE_BY_ID[it.id]?MODULE_BY_ID[it.id].nome:it.id,origine:it.origine,
+      priorita:it.priorita,motivi:it.motivi,incluso:it.incluso,esito:it.esito,
+      strumento:it.strumento,note:it.note})),
+    confronto:prevSess?{conValutazione:prevSess.code,
+      dataPrecedente:prevSess.anagrafica.dataValutazione,
+      testo:comparisonText(prevSess,s),notaClinico:s.confronto.nota}:null,
+    conclusioni:s.referto.conclusioni,raccomandazioni:s.referto.raccomandazioni,
+    followUp:s.referto.followUp,limitiExtra:s.referto.limitiExtra,
+    testoCompleto:s.referto.testoManuale||buildReport(s,normPacks,sessions),
+    versioniSalvate:(s.referto.versioni||[]).map(v=>({n:v.n,salvatoAt:v.salvatoAt})),
+    avvertenza:"Bozza generata automaticamente: non costituisce diagnosi. Interpretazione e conclusioni restano di esclusiva competenza e responsabilità del professionista."
+  };
+}
+
 /* ---------- Import / export e migrazione ---------- */
 function exportPayload(sessions,onlyId){
   const list=onlyId?[sessions[onlyId]]:Object.values(sessions);
@@ -1032,7 +1087,7 @@ function sanitizeSession(raw){
       const t=newSomm();
       if(["da-fare","completato","non-eseguito","non-interpretabile"].includes(e.stato))t.stato=e.stato;
       if(RATINGS.some(r=>r.id===e.classif))t.classif=e.classif;
-      copyStr(t,e,["motivo","grezzo","corretto","tempoSec","errori","autocorrezioni","intrusioni","perseverazioni","note"]);
+      copyStr(t,e,["motivo","grezzo","corretto","tempoSec","errori","autocorrezioni","intrusioni","perseverazioni","note","versioneProva"]);
       if(e.risposte&&typeof e.risposte==="object")Object.keys(e.risposte).forEach(k=>{
         const v=e.risposte[k];
         if(Number.isInteger(v)&&v>=0&&v<=5)t.risposte[k]=v;
@@ -1605,6 +1660,8 @@ function viewProve(){
           ${sommField(tid,"autocorrezioni","Autocorrezioni",e.autocorrezioni,errs.autocorrezioni)}
           ${sommField(tid,"intrusioni","Intrusioni",e.intrusioni,errs.intrusioni)}
           ${sommField(tid,"perseverazioni","Perseverazioni",e.perseverazioni,errs.perseverazioni)}
+          <div><label for="s_${tid}_ver">Versione della prova</label>
+          <input type="text" id="s_${tid}_ver" data-som="${tid}" data-field="versioneProva" value="${esc(e.versioneProva)}" autocomplete="off" placeholder="es. forma A"></div>
         </div>
         ${t.tipiErrore.length?`<p class="muted small">Tipi di errore previsti per questa prova: ${esc(t.tipiErrore.join(", "))}.</p>`:""}
         <div class="grid2">
@@ -1635,7 +1692,19 @@ function viewProve(){
     <div class="banner info"><strong>${esc(next.titolo)}</strong><br>${esc(next.motivo)}
       <div class="btnrow"><button class="primary" data-action="guided-next">Apri il prossimo passaggio</button></div></div>
     <div class="flow" aria-label="Flusso guidato"><div class="node">1. Condizioni e quesito</div><div class="node active">2. Prova indicata</div><div class="node">3. Controllo del risultato</div><div class="node">4. Approfondimento motivato</div></div>
+    ${(()=>{
+      const tot=(s.batteria||[]).length;
+      const fatte=(s.batteria||[]).filter(x=>{const e2=s.somministrazioni[x];return e2&&e2.stato!=="da-fare";}).length;
+      return tot?`<div id="som-progress" class="btnrow" style="margin:0 0 .6rem">
+        <span class="muted small">Registrate <strong>${fatte}</strong> di <strong>${tot}</strong> prove</span>
+        <div class="prog" style="flex:1;min-width:8rem"><div style="width:${Math.round(fatte/tot*100)}%"></div></div>
+        <button class="mini" data-action="cards-open">Apri tutte</button>
+        <button class="mini" data-action="cards-close">Chiudi tutte</button>
+      </div>`:"";
+    })()}
+    <div class="prove-grid">
     ${cards||'<p class="muted">La batteria è vuota: tornare al passo 3.</p>'}
+    </div>
     <label for="f_oss">Osservazioni comportamentali durante l'esame</label>
     <textarea id="f_oss" data-bind="osservazioni">${esc(s.osservazioni)}</textarea>
     ${navRow("batteria","profilo","Avanti: profilo per domini")}
@@ -1763,7 +1832,8 @@ function viewConfronto(){
     <td>${cell(fmtSec(t.tempoPrev),fmtSec(t.tempoCurr),null)}${t.dTempo!=null?` <strong>(${fmtDelta(t.dTempo)}s)</strong>`:""}</td>
     <td>${cell(t.erroriPrev,t.erroriCurr,t.dErrori)}</td>
     <td>${t.classifPrev!=="na"||t.classifCurr!=="na"
-      ?`${RATING_LABEL[t.classifPrev]} → ${RATING_LABEL[t.classifCurr]}${t.classifVariata?' <span class="badge borderline">variata</span>':""}`:""}</td>
+      ?`${RATING_LABEL[t.classifPrev]} → ${RATING_LABEL[t.classifCurr]}${t.classifVariata?' <span class="badge borderline">variata</span>':""}`:""}
+      ${t.versioneDiversa?' <span class="badge deficit">versioni diverse</span>':""}</td>
   </tr>`).join("");
   const domRows=cmp.domini.map(d=>`<tr><td>${domName(d.dom)}</td>
     <td><span class="badge ${d.prev}">${RATING_LABEL[d.prev]}</span></td>
@@ -1851,6 +1921,8 @@ function viewReferto(){
       <button data-action="regen-report">Rigenera dai dati</button>
       <button data-action="save-version">Salva come versione (v${versioni.length+1})</button>
       <button data-action="copy-report">Copia il testo</button>
+      <button data-action="export-report-txt">Scarica testo (TXT)</button>
+      <button data-action="export-report-json">Esporta referto strutturato (JSON)</button>
       <button data-action="print-report" class="primary">Stampa / salva PDF</button>
     </div>
     ${versioni.length?`<h4 style="margin-top:1rem">Versioni salvate</h4>
@@ -1875,6 +1947,16 @@ function setPath(obj,path,val){
   const parts=path.split(".");let o=obj;
   for(let i=0;i<parts.length-1;i++){o=o[parts[i]];if(o==null)return;}
   o[parts[parts.length-1]]=val;
+}
+function downloadBlob(blob,nome){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=nome;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+function downloadText(testo,nome){
+  try{downloadBlob(new Blob([testo],{type:"text/plain;charset=utf-8"}),nome);toast("File esportato: "+nome,"ok");}
+  catch(e){console.error(e);toast("Esportazione non riuscita: "+e.message,"error");}
 }
 function downloadJSON(payload,nome){
   try{
@@ -2058,7 +2140,18 @@ const ACTIONS={
   "print-report":()=>{
     $("#printArea").innerHTML=reportFormattedHTML(cur(),$("#reportText").value);
     window.print();
-  }
+  },
+  "export-report-txt":()=>{
+    const s=cur();
+    downloadText($("#reportText").value,"referto-"+s.code+"-"+s.anagrafica.dataValutazione+".txt");
+  },
+  "export-report-json":()=>{
+    const s=cur();
+    downloadJSON(buildStructuredReport(s,state.normPacks,state.sessions),
+      "referto-strutturato-"+s.code+"-"+s.anagrafica.dataValutazione+".json");
+  },
+  "cards-open":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=true;});},
+  "cards-close":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=false;});}
 };
 
 document.addEventListener("click",e=>{

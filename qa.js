@@ -25,7 +25,7 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "MSG_NO_NORME","validateNormPack","validateMaterialPack","materialScore","OPEN_MATERIALS","materialForTest","scoreTest","testsOfDomain","domainProfile","profileHash",
   "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
   "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
-  "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport",
+  "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport","buildStructuredReport",
   "exportPayload","sanitizeSession","migrateV1","parseImport","demoSession","demoSessions","nowISO","uid"];
 try{
   vm.runInContext(m[1]+"\n;this.__NS={"+EXPORTS.join(",")+"};",ctx,{filename:"index.html <logica>"});
@@ -501,6 +501,91 @@ t("demoSessions: coppia collegata, fittizia e valida",()=>{
   });
 });
 
+/* ---------- referto strutturato (iterazione 3) ---------- */
+t("referto strutturato: intestazione, prove e domini completi",()=>{
+  const {prima,dopo,sessions}=coppiaDemo();
+  const r=L.buildStructuredReport(dopo,[],sessions);
+  eq(r.app,"neuroscreen-referto");eq(r.formato,1);
+  eq(r.codiceValutazione,dopo.code);
+  eq(r.codicePaziente,"DEMO-PZ");
+  eq(r.prove.length,dopo.batteria.length,"una voce per ogni prova in batteria");
+  const mmse=r.prove.find(p=>p.id==="mmse");
+  ["sigla","nome","dominio","stato","motivo","grezzo","correttoManuale","correttoDaFonte",
+   "classificazioneClinico","tempoSec","errori","autocorrezioni","intrusioni","perseverazioni",
+   "versioneProva","note"].forEach(k=>ok(k in mmse,"manca il campo prova: "+k));
+  eq(mmse.grezzo,"24");eq(mmse.classificazioneClinico,"deficit");
+  ok(r.domini.length>0,"domini assenti");
+  const dm=r.domini[0];
+  ["id","nome","giudizio","giudizioDelClinico","affidabilita","sintesi","nota"].forEach(k=>ok(k in dm,"manca il campo dominio: "+k));
+  ok(Array.isArray(r.osservazioniQualitative));
+  ok(Array.isArray(r.secondoLivello));
+  ok(typeof r.testoCompleto==="string"&&r.testoCompleto.includes("BOZZA DI REFERTO"));
+  ok(/non costituisce diagnosi/i.test(r.avvertenza));
+});
+t("referto strutturato: confronto valorizzato per il controllo, null per la baseline",()=>{
+  const {prima,dopo,sessions}=coppiaDemo();
+  dopo.confronto.nota="nota di confronto";
+  const r=L.buildStructuredReport(dopo,[],sessions);
+  ok(r.confronto,"confronto assente");
+  eq(r.confronto.conValutazione,prima.code);
+  eq(r.confronto.notaClinico,"nota di confronto");
+  ok(r.confronto.testo.join("\n").includes("effetto pratica"),"limiti assenti dal confronto strutturato");
+  eq(L.buildStructuredReport(prima,[],sessions).confronto,null);
+});
+t("referto strutturato: correttoDaFonte solo con pacchetto normativo, con fonte citata",()=>{
+  const {dopo,sessions}=coppiaDemo();
+  const senza=L.buildStructuredReport(dopo,[],sessions);
+  eq(senza.prove.find(p=>p.id==="mmse").correttoDaFonte,null);
+  const con=L.buildStructuredReport(dopo,[packFinto],sessions);
+  const cf=con.prove.find(p=>p.id==="mmse").correttoDaFonte;
+  ok(cf,"correttoDaFonte assente col pacchetto");
+  eq(cf.valore,25.5);
+  ok(/fittizia/i.test(cf.fonte),"fonte non citata");
+});
+t("referto strutturato: nessun termine diagnostico automatico",()=>{
+  const {dopo,sessions}=coppiaDemo();
+  const j=JSON.stringify(L.buildStructuredReport(dopo,[],sessions));
+  ok(!/diagnosi di|demenza|alzheimer|deterioramento cognitivo lieve/i.test(j.replace(/non costituisce diagnosi/gi,"")),
+    "termini diagnostici nel referto strutturato");
+});
+
+/* ---------- versione della prova (iterazione 3) ---------- */
+t("versioneProva: sopravvive a sanitize/export e parte vuota",()=>{
+  eq(L.newSomm().versioneProva,"");
+  const s=L.newSession("QA-V");
+  s.batteria=["denominazione"];
+  s.somministrazioni["denominazione"]=Object.assign(L.newSomm(),{stato:"completato",classif:"norma",versioneProva:"forma A"});
+  const res=L.parseImport(JSON.stringify(L.exportPayload({[s.id]:s})));
+  ok(res.ok,res.errore);
+  eq(res.sessions[0].somministrazioni["denominazione"].versioneProva,"forma A");
+});
+t("versioneProva: versioni diverse rilevate nel confronto e assenti se uguali o vuote",()=>{
+  const {prima,dopo}=coppiaDemo();
+  prima.somministrazioni["mmse"].versioneProva="forma A";
+  dopo.somministrazioni["mmse"].versioneProva="forma B";
+  prima.somministrazioni["tmt-a"].versioneProva="std";
+  dopo.somministrazioni["tmt-a"].versioneProva="std";
+  const cmp=L.compareSessions(prima,dopo);
+  ok(cmp.tests.find(t=>t.tid==="mmse").versioneDiversa,"forma A vs B non rilevato");
+  ok(!cmp.tests.find(t=>t.tid==="tmt-a").versioneDiversa,"versioni uguali segnalate");
+  ok(!cmp.tests.find(t=>t.tid==="digit-avanti").versioneDiversa,"versioni vuote segnalate");
+  ok(cmp.tests.find(t=>t.tid==="lista-diff")===undefined||!cmp.tests.find(t=>t.tid==="lista-diff").versioneDiversa);
+  /* una sola versione indicata: comunque da segnalare */
+  dopo.somministrazioni["lista-appr"].versioneProva="forma B";
+  const cmp2=L.compareSessions(prima,dopo);
+  ok(cmp2.tests.find(t=>t.tid==="lista-appr").versioneDiversa,"versione indicata solo in una valutazione non segnalata");
+});
+t("versioneProva: avvertenza esplicita nel testo del confronto e nel referto",()=>{
+  const {prima,dopo,sessions}=coppiaDemo();
+  prima.somministrazioni["mmse"].versioneProva="forma A";
+  dopo.somministrazioni["mmse"].versioneProva="forma B";
+  const txt=L.comparisonText(prima,dopo).join("\n");
+  ok(txt.includes("versioni della prova diverse"),"avvertenza assente dal confronto");
+  ok(txt.includes("forma A")&&txt.includes("forma B"),"versioni non citate");
+  ok(txt.includes("confronto non attendibile"),"mancata qualifica di non attendibilità");
+  ok(L.buildReport(dopo,[],sessions).includes("versioni della prova diverse"),"avvertenza assente dal referto");
+});
+
 /* ---------- vincoli sull'HTML ---------- */
 t("HTML: nessuna risorsa esterna, nessuna chiamata di rete",()=>{
   ok(!/\bsrc\s*=\s*["']https?:/i.test(html));
@@ -531,6 +616,14 @@ t("strumenti gratuiti: ACE-III e M-ACE con fonte ufficiale",()=>{
     eq(L.TEST_BY_ID[id].licenza,"gratuita-ufficiale");
     ok(L.TEST_GUIDES[id].officialUrl.includes("sydney.edu.au"));
   });
+});
+t("HTML: comandi dell'iterazione 3 presenti (export referto, avanzamento, apri/chiudi, versione prova)",()=>{
+  ok(html.includes('data-action="export-report-txt"'),"manca export TXT");
+  ok(html.includes('data-action="export-report-json"'),"manca export strutturato");
+  ok(html.includes("som-progress"),"manca l'indicatore di avanzamento");
+  ok(html.includes('data-action="cards-open"')&&html.includes('data-action="cards-close"'),"mancano apri/chiudi tutte");
+  ok(html.includes('data-field="versioneProva"'),"manca il campo versione della prova");
+  ok(/prove-grid\{display:grid/.test(html),"manca la griglia a due colonne per tablet");
 });
 t("PWA: manifest e service worker coerenti",()=>{
   const man=JSON.parse(fs.readFileSync(path.join(__dirname,"manifest.json"),"utf8"));

@@ -63,5 +63,6 @@ netti:
 7. referto strutturato con versionamento — FATTO in v3 (PDF via stampa browser)
 8. confronto longitudinale — FATTO in v4 (codice paziente, valutazione di controllo,
    passo 7 di confronto descrittivo, sezione 10 del referto; demo con coppia collegata)
-9. modalità demo estesa, esport referto strutturato, rifiniture UI tablet — successive
+9. referto strutturato (JSON+TXT), versione della prova nel confronto, rifiniture
+   tablet del passo 4 — FATTO in v5
 10. hardening privacy/sicurezza oltre la demo — quando si uscirà dal perimetro locale
