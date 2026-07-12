@@ -4,7 +4,7 @@
    salvata) — mai cache-prima per index.html, altrimenti gli aggiornamenti
    non arrivano. Icone e manifest: cache-prima. */
 "use strict";
-const CACHE="neuroscreen-sw-v6";
+const CACHE="neuroscreen-sw-v7";
 /* index.html va salvata già all'installazione: la prima navigazione avviene
    prima che il service worker prenda il controllo, e senza questa copia
    l'app non si aprirebbe offline dopo una sola visita */

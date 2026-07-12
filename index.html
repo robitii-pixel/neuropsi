@@ -172,6 +172,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
 <div id="printArea" class="print-only"></div>
 <input type="file" id="fileImport" accept=".json,application/json" hidden>
 <input type="file" id="fileNorms" accept=".json,application/json" hidden>
+<input type="file" id="fileMaterials" accept=".json,application/json" hidden>
 
 <script>
 "use strict";
@@ -181,7 +182,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v6";
+const APPV="v7";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -477,6 +478,39 @@ function validateNormPack(obj){
         return "Classe interpretativa non valida (servono min, max, etichetta).";
   }
   return null;
+}
+
+/* Pacchetti di somministrazione autorizzati. Il repository non contiene
+   materiali protetti: il titolare della licenza li importa sul dispositivo.
+   Un pacchetto dichiara esplicitamente fonte, versione e autorizzazione. */
+function validateMaterialPack(obj){
+  if(!obj||typeof obj!=="object"||obj.app!=="neuroscreen-materiali")return "Il file non è un pacchetto materiali di NeuroScreen.";
+  if(obj.formato!==1)return "Formato materiali non riconosciuto (atteso: 1).";
+  if(!TEST_BY_ID[obj.test])return "Il test indicato non è nel catalogo: "+obj.test;
+  if(!obj.titolo||!obj.versione||!obj.fonte)return "Servono titolo, versione e fonte del materiale.";
+  if(!obj.licenza||obj.licenza.confermata!==true||!obj.licenza.riferimento)
+    return "La licenza deve essere confermata e accompagnata dal relativo riferimento.";
+  if(!Array.isArray(obj.items)||!obj.items.length)return "Il pacchetto non contiene item.";
+  const ids=new Set();
+  for(const it of obj.items){
+    if(!it||typeof it!=="object"||!it.id||ids.has(it.id))return "Ogni item deve avere un id univoco.";
+    ids.add(it.id);
+    if(!["scelta","testo","numero","nota"].includes(it.tipo))return "Tipo di item non valido: "+it.tipo;
+    if(it.tipo==="scelta"&&(!Array.isArray(it.opzioni)||it.opzioni.length<2))return "Un item a scelta richiede almeno due opzioni.";
+    if(it.opzioni&&it.opzioni.some(o=>!o||typeof o.valore!=="string"||typeof o.etichetta!=="string"))return "Opzioni non valide nell’item "+it.id;
+  }
+  return null;
+}
+function materialScore(pack,e){
+  if(!pack)return null;let totale=0,completi=0,allerta=false;
+  pack.items.forEach(it=>{
+    const v=(e&&e.risposte||{})[it.id];if(v==null||v==="")return;completi++;
+    if(it.tipo==="scelta"){
+      const o=it.opzioni.find(x=>x.valore===String(v));if(o&&typeof o.punti==="number")totale+=o.punti;
+      if(it.sicurezza&&o&&o.allerta===true)allerta=true;
+    }
+  });
+  return {completo:completi===pack.items.length,completi,totale,allerta};
 }
 function scoreTest(testId,inp,normPacks){
   const pack=(normPacks||[]).find(p=>p.test===testId);
@@ -959,7 +993,9 @@ function sanitizeSession(raw){
       if(RATINGS.some(r=>r.id===e.classif))t.classif=e.classif;
       copyStr(t,e,["motivo","grezzo","corretto","tempoSec","errori","autocorrezioni","intrusioni","perseverazioni","note"]);
       if(e.risposte&&typeof e.risposte==="object")Object.keys(e.risposte).forEach(k=>{
-        const v=e.risposte[k];if(Number.isInteger(v)&&v>=0&&v<=5)t.risposte[k]=v;
+        const v=e.risposte[k];
+        if(Number.isInteger(v)&&v>=0&&v<=5)t.risposte[k]=v;
+        else if(typeof v==="string"&&v.length<=4000)t.risposte[k]=v;
       });
       base.somministrazioni[tid]=t;
     });
@@ -1079,7 +1115,7 @@ let state=null;
 let currentView="home";
 let saveTimer=null;
 
-function defaultState(){return {version:2,sessions:{},currentId:null,normPacks:[]};}
+function defaultState(){return {version:2,sessions:{},currentId:null,normPacks:[],materialPacks:[]};}
 function loadState(){
   try{
     const raw=localStorage.getItem(LS_KEY);
@@ -1091,6 +1127,8 @@ function loadState(){
     clean.currentId=(st.currentId&&clean.sessions[st.currentId])?st.currentId:null;
     if(Array.isArray(st.normPacks))
       clean.normPacks=st.normPacks.filter(p=>validateNormPack(p)===null);
+    if(Array.isArray(st.materialPacks))
+      clean.materialPacks=st.materialPacks.filter(p=>validateMaterialPack(p)===null);
     return clean;
   }catch(e){
     console.error(e);
@@ -1250,6 +1288,7 @@ function viewHome(){
     </div>`;
   }).join("");
   const nNorme=(state.normPacks||[]).length;
+  const nMateriali=(state.materialPacks||[]).length;
   return `
   <div class="banner warn"><strong>Versione dimostrativa, non autorizzata per uso clinico reale.</strong>
   Nessun materiale di test protetto e nessuna norma integrata; i dati restano su questo dispositivo.</div>
@@ -1281,6 +1320,14 @@ function viewHome(){
       <button data-action="import-norms">Importa pacchetto normativo (JSON)</button>
       ${nNorme?'<button data-action="clear-norms" class="danger">Rimuovi tutte le fonti</button>':""}
     </div>
+  </div>
+  <div class="card">
+    <h3>Materiali autorizzati (${nMateriali})</h3>
+    <p class="muted small">Qui puoi importare i contenuti dei test per i quali possiedi una licenza.
+    Il pacchetto resta soltanto su questo dispositivo e deve dichiarare test, versione, fonte e
+    riferimento dell’autorizzazione. ${nMateriali?"Attivi: "+esc(state.materialPacks.map(p=>TEST_BY_ID[p.test].sigla+" "+p.versione).join("; "))+".":""}</p>
+    <div class="btnrow"><button data-action="import-materials">Importa materiale autorizzato</button>
+    ${nMateriali?'<button data-action="clear-materials" class="danger">Rimuovi tutti i materiali</button>':""}</div>
   </div>
   <div class="card">
     <h3>Copia di sicurezza e privacy</h3>
@@ -1440,20 +1487,39 @@ function who5Form(e,assistito){
     <p class="muted small">World Health Organization, WHO-5, 2024. Licenza CC BY-NC-SA 3.0 IGO. La traduzione italiana precede l’assegnazione del copyright all’OMS; in caso di difformità prevale l’originale inglese.</p>
   </div>`;
 }
+function materialForm(pack,e,assistito){
+  const sc=materialScore(pack,e);
+  const fields=pack.items.map((it,i)=>{
+    const domanda=assistito?(it.testoAssistito||it.testoMedico):(it.testoMedico||it.testoAssistito);
+    if(it.tipo==="scelta")return `<div class="assist-item"><label for="mp_${pack.test}_${i}">${i+1}. ${esc(domanda)}</label>
+      <select id="mp_${pack.test}_${i}" data-pack-answer="${pack.test}" data-answer-index="${esc(it.id)}"><option value="">Scegli una risposta</option>
+      ${it.opzioni.map(o=>`<option value="${esc(o.valore)}"${String(e.risposte[it.id]??"")===o.valore?" selected":""}>${esc(o.etichetta)}</option>`).join("")}</select></div>`;
+    const type=it.tipo==="numero"?"number":"text";
+    return `<div class="assist-item"><label for="mp_${pack.test}_${i}">${i+1}. ${esc(domanda)}</label>
+      ${it.tipo==="nota"?`<textarea id="mp_${pack.test}_${i}" data-pack-answer="${pack.test}" data-answer-index="${esc(it.id)}">${esc(e.risposte[it.id]||"")}</textarea>`:`<input type="${type}" id="mp_${pack.test}_${i}" data-pack-answer="${pack.test}" data-answer-index="${esc(it.id)}" value="${esc(e.risposte[it.id]||"")}">`}</div>`;
+  }).join("");
+  return `<div class="${assistito?"assist-card":""}"><h3>${esc(pack.titolo)} <span class="muted">${esc(pack.versione)}</span></h3>
+    <p>${esc(assistito?(pack.istruzioniAssistito||"Rispondi seguendo le indicazioni del professionista."):(pack.istruzioniMedico||"Seguire le istruzioni autorizzate allegate al materiale."))}</p>${fields}
+    ${sc&&sc.allerta?'<div class="banner error"><strong>Revisione clinica immediata richiesta.</strong> Una risposta è marcata come sensibile nel pacchetto. Non lasciare la persona sola e seguire il protocollo del servizio.</div>':""}
+    ${!assistito&&sc?`<div class="banner info">Completati ${sc.completi}/${pack.items.length} item${sc.completo?`. Punteggio grezzo calcolato: ${sc.totale}.`:"."} Nessuna interpretazione automatica.</div>`:""}
+    <p class="muted small">Materiale importato localmente — fonte: ${esc(pack.fonte)}; licenza: ${esc(pack.licenza.riferimento)}.</p></div>`;
+}
 function viewProve(){
   const s=cur();
   const next=guidedNext(s);const assistito=s.modalita==="assistito";
   if(assistito){
     const tid=next.test;
-    if(!tid||testGuide(tid).chi!=="assistito")return `<div class="card"><div class="mode-switch"><button data-action="set-mode" data-mode="medico">Torna all’interfaccia del medico</button></div><div class="assist-card"><h3>Attendi il medico</h3><p>La prossima attività richiede la conduzione del professionista. Non sono mostrati materiali clinici o risultati interpretativi.</p></div></div>`;
+    const pack=tid&&(state.materialPacks||[]).find(p=>p.test===tid);
+    if(!tid||(testGuide(tid).chi!=="assistito"&&!pack))return `<div class="card"><div class="mode-switch"><button data-action="set-mode" data-mode="medico">Torna all’interfaccia del medico</button></div><div class="assist-card"><h3>Attendi il medico</h3><p>La prossima attività richiede la conduzione del professionista. Non sono mostrati materiali clinici o risultati interpretativi.</p></div></div>`;
     const e=s.somministrazioni[tid]||(s.somministrazioni[tid]=newSomm());
-    return `<div class="card"><div class="mode-switch"><button data-action="set-mode" data-mode="medico">Torna all’interfaccia del medico</button></div>${tid==="who5"?who5Form(e,true):""}</div>`;
+    return `<div class="card"><div class="mode-switch"><button data-action="set-mode" data-mode="medico">Torna all’interfaccia del medico</button></div>${pack?materialForm(pack,e,true):(tid==="who5"?who5Form(e,true):"")}</div>`;
   }
   const packs=state.normPacks||[];
   const cards=(s.batteria||[]).map(tid=>{
     const t=TEST_BY_ID[tid];
     if(!s.somministrazioni[tid])s.somministrazioni[tid]=newSomm();
     const e=s.somministrazioni[tid];
+    const materialPack=(state.materialPacks||[]).find(p=>p.test===tid);
     const errs=validateSomm(tid,e);
     const stati=[["completato","Completata"],["da-fare","Da fare"],["non-eseguito","Non eseguita"],["non-interpretabile","Non interpretabile"]];
     const sc=e.stato==="completato"?scoreTest(tid,{grezzo:e.grezzo,etaAnni:s.anagrafica.etaAnni,scolaritaAnni:s.anagrafica.scolaritaAnni,sesso:s.anagrafica.sesso},packs):null;
@@ -1466,7 +1532,7 @@ function viewProve(){
       </summary>
       <div class="body">
         ${guidePanel(tid)}
-        ${tid==="who5"?who5Form(e,false):""}
+        ${materialPack?materialForm(materialPack,e,false):(tid==="who5"?who5Form(e,false):"")}
         <div class="stato-row">
           ${stati.map(([v,l])=>`<button class="mini${e.stato===v?" on":""}" data-action="som-stato" data-id="${tid}" data-val="${v}">${l}</button>`).join("")}
         </div>
@@ -1809,9 +1875,14 @@ const ACTIONS={
   "export-all":()=>downloadJSON(exportPayload(state.sessions),"neuroscreen-backup-"+(new Date()).toISOString().slice(0,10)+".json"),
   "import":()=>$("#fileImport").click(),
   "import-norms":()=>$("#fileNorms").click(),
+  "import-materials":()=>$("#fileMaterials").click(),
   "clear-norms":()=>{
     if(!confirm("Rimuovere tutte le fonti normative importate?"))return;
     state.normPacks=[];persist();render();toast("Fonti normative rimosse.");
+  },
+  "clear-materials":()=>{
+    if(!confirm("Rimuovere tutti i materiali di test importati da questo dispositivo?"))return;
+    state.materialPacks=[];persist();render();toast("Materiali autorizzati rimossi.");
   },
   "battery-base":()=>{
     const s=cur();
@@ -1934,6 +2005,12 @@ document.addEventListener("input",e=>{
     const score=tid==="who5"?who5Score(eSom):null;
     if(score){eSom.grezzo=String(score.grezzo);eSom.corretto=String(score.percentuale);eSom.stato="completato";}
     touchSession();render();
+  }else if(el.dataset.packAnswer){
+    const tid=el.dataset.packAnswer;const eSom=s.somministrazioni[tid]||(s.somministrazioni[tid]=newSomm());
+    eSom.risposte[el.dataset.answerIndex]=el.value;
+    const pack=(state.materialPacks||[]).find(p=>p.test===tid);const sc=materialScore(pack,eSom);
+    if(sc&&sc.completo){eSom.grezzo=String(sc.totale);eSom.stato="completato";}
+    touchSession();render();
   }else if(el.dataset.validita){
     s.validita.valori[el.dataset.validita]=Number(el.value)||0;touchSession();
   }else if(el.dataset.override){
@@ -1991,6 +2068,14 @@ $("#fileNorms").addEventListener("change",async e=>{
   state.normPacks.push(obj);
   persist();render();
   toast("Fonte normativa importata per "+TEST_BY_ID[obj.test].nome+" ("+obj.fonte+"). Verificarne l'applicabilità resta responsabilità del clinico.","ok");
+});
+$("#fileMaterials").addEventListener("change",async e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  let obj;try{obj=JSON.parse(await f.text());}catch(err){toast("Il file non è un JSON valido.","error");return;}
+  const err=validateMaterialPack(obj);if(err){toast(err,"error");return;}
+  if(!confirm("Confermi di possedere l’autorizzazione indicata per "+TEST_BY_ID[obj.test].nome+" ("+obj.licenza.riferimento+")?"))return;
+  state.materialPacks=(state.materialPacks||[]).filter(p=>p.test!==obj.test);state.materialPacks.push(obj);
+  persist();render();toast("Materiale autorizzato attivato per "+TEST_BY_ID[obj.test].nome+".","ok");
 });
 
 /* PWA: solo via http(s); aperta come file locale nulla cambia */

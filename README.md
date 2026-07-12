@@ -70,6 +70,26 @@ classificare), tipi di errore, stato della licenza, stato di configurazione.
 - MoCA, MMSE e gli altri strumenti protetti restano schede guidate senza item o istruzioni:
   richiedono materiale originale, versione e autorizzazioni appropriate.
 
+### Materiali con licenza (v7)
+
+La Home accetta pacchetti JSON locali `neuroscreen-materiali`. In questo modo l’interfaccia,
+lo scoring grezzo e il passaggio medico/assistito sono già pronti per tutti i test del catalogo,
+ma il repository pubblico non distribuisce contenuti protetti. Ogni pacchetto deve indicare
+test, titolo, versione, fonte e riferimento della licenza confermata. Gli item possono essere
+di tipo `scelta`, `testo`, `numero` o `nota`; le opzioni possono avere punti e un indicatore di
+allerta clinica. L’app calcola soltanto il grezzo, non interpreta automaticamente il risultato.
+
+Esempio minimo:
+
+```json
+{"app":"neuroscreen-materiali","formato":1,"test":"mmse",
+ "titolo":"Titolo autorizzato","versione":"versione","fonte":"editore/manuale",
+ "licenza":{"confermata":true,"riferimento":"numero o documento"},
+ "istruzioniMedico":"...","istruzioniAssistito":"...",
+ "items":[{"id":"i1","tipo":"scelta","testoMedico":"...","testoAssistito":"...",
+   "opzioni":[{"valore":"0","etichetta":"...","punti":0},{"valore":"1","etichetta":"...","punti":1}]}]}
+```
+
 ## Motore di scoring
 
 Separato dall'interfaccia (`scoreTest`), vuoto per progetto. Le norme si aggiungono

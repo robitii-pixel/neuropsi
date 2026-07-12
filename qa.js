@@ -22,7 +22,7 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "CATS","TESTS","TEST_BY_ID","BATTERIA_BASE","VALIDITA","validitaInterferenze",
   "TEST_GUIDES","testGuide","who5Score","guidedNext",
   "newSession","newSomm","validateCode","validateAnagrafica","validateSomm",
-  "MSG_NO_NORME","validateNormPack","scoreTest","testsOfDomain","domainProfile","profileHash",
+  "MSG_NO_NORME","validateNormPack","validateMaterialPack","materialScore","scoreTest","testsOfDomain","domainProfile","profileHash",
   "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
   "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
   "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport",
@@ -81,6 +81,15 @@ t("WHO-5: fonte, cinque item e scoring completo",()=>{
   eq(L.TEST_GUIDES.who5.items.length,5);
   eq(L.who5Score({risposte:{0:5,1:4,2:3,3:2,4:1}}),{grezzo:15,percentuale:60,approfondire:true});
   eq(L.who5Score({risposte:{0:5,1:5}}),null);
+});
+const packMateriale={app:"neuroscreen-materiali",formato:1,test:"mmse",titolo:"Materiale autorizzato di collaudo",versione:"X",
+  fonte:"Fonte fittizia QA",licenza:{confermata:true,riferimento:"LIC-QA"},items:[
+    {id:"a",tipo:"scelta",testoMedico:"Item A",opzioni:[{valore:"0",etichetta:"No",punti:0},{valore:"1",etichetta:"Sì",punti:1,allerta:true}],sicurezza:true},
+    {id:"b",tipo:"testo",testoMedico:"Nota"}]};
+t("materiali autorizzati: licenza obbligatoria, schema e scoring",()=>{
+  eq(L.validateMaterialPack(packMateriale),null);
+  ok(L.validateMaterialPack(Object.assign({},packMateriale,{licenza:{confermata:false,riferimento:""}})));
+  eq(L.materialScore(packMateriale,{risposte:{a:"1",b:"nota"}}),{completo:true,completi:2,totale:1,allerta:true});
 });
 t("flusso guidato: apre la prima prova incompleta e propone approfondimento WHO-5",()=>{
   const s=L.newSession("QA-FLOW");s.batteria=["who5","orientamento"];
