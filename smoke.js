@@ -163,6 +163,26 @@ const VIEWPORTS=[
     ok(!(await page.isChecked("#inc_validita")),"esclusione del clinico persistita");
     ok(await page.locator("#es_amnestico").inputValue()==="deficit","esito approfondimento persistito");
 
+    // confronto longitudinale con la coppia dimostrativa
+    await page.click('.step[data-view="referto"]');
+    await page.click('button[data-action="goto"][data-view="home"]');
+    await page.click('button[data-action="new-demo"]');
+    ok((await page.textContent("#topSess")).includes("DEMO-PZ-2"),"coppia demo creata, aperto il controllo");
+    await page.click('.step[data-view="confronto"]');
+    ok(await page.locator("h3").first().textContent().then(t=>t.includes("Passo 7")),"passo 7 (confronto) raggiunto");
+    const cmpTx=await page.textContent("main");
+    ok(cmpTx.includes("Prove confrontabili"),"tabella confronto presente");
+    ok(cmpTx.includes("(-2)"),"delta del grezzo MMSE mostrato");
+    ok(cmpTx.includes("variata"),"classificazione variata evidenziata");
+    ok(cmpTx.includes("effetto pratica")&&cmpTx.includes("RCI"),"limiti del confronto mostrati");
+    ok(cmpTx.includes("Solo nella valutazione precedente"),"prove non ripetute segnalate");
+    await page.fill('[data-bind="confronto.nota"]',"Lettura clinica del confronto (prova).");
+    await page.click('.step[data-view="referto"]');
+    const rep2=await page.inputValue("#reportText");
+    ok(rep2.includes("Valutazione precedente: DEMO-001"),"sezione 10 dal confronto");
+    ok(rep2.includes("Lettura clinica del confronto (prova)."),"nota del clinico nel referto");
+    ok(rep2.includes("effetto pratica"),"limiti nel referto");
+
     // overflow orizzontale e tocchi
     const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
     ok(overflow<=0,"nessuno scroll orizzontale (overflow="+overflow+"px)");

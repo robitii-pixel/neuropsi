@@ -7,7 +7,7 @@ dipendenza: si apre con un doppio clic in qualunque browser moderno, anche offli
 
 **Versione dimostrativa, non autorizzata per uso clinico reale.**
 
-## Percorso clinico (7 passi)
+## Percorso clinico (8 passi)
 
 1. **Sessione e quesito** — codice pseudonimo obbligatorio; età, sesso, scolarità,
    lingua madre, professione, lateralità; quesito clinico, sospetto dell'inviante,
@@ -30,10 +30,17 @@ dipendenza: si apre con un doppio clic in qualunque browser moderno, anche offli
    colloquio caregiver, errori qualitativi, multidominio → impatto funzionale); ogni
    proposta dichiara perché è stata generata e con che priorità; il clinico accetta,
    rifiuta o aggiunge moduli.
-7. **Referto** — 14 sezioni + firma (dati, quesito, anamnesi, comportamento, validità,
+7. **Confronto longitudinale** — tra valutazioni con lo stesso "codice paziente":
+   variazioni di punteggi grezzi, tempi, errori e classificazioni per le prove
+   completate in entrambe, variazioni dei giudizi di dominio (incluse autonomia,
+   umore e comportamento), prove presenti in una sola valutazione, lettura clinica
+   del confronto. Sempre descrittivo: limiti espliciti su effetto pratica e assenza
+   di RCI, nessuna variazione dichiarata significativa. Il pulsante "Controllo"
+   crea la valutazione di follow-up copiando batteria e dati stabili.
+8. **Referto** — 14 sezioni + firma (dati, quesito, anamnesi, comportamento, validità,
    tabella risultati, domini, osservazioni qualitative da regole descrittive, sintesi,
-   confronto, limiti, conclusioni, indicazioni, follow-up); sempre modificabile, con
-   versionamento, copia, stampa/PDF ed esportazione strutturata.
+   confronto longitudinale, limiti, conclusioni, indicazioni, follow-up); sempre
+   modificabile, con versionamento, copia, stampa/PDF ed esportazione strutturata.
 
 ## Catalogo test e principi
 
@@ -76,18 +83,20 @@ fonte normativa validata."* — e il punteggio corretto resta inseribile a mano.
 
 ## Controlli
 
-- `npm run check` — 37 test senza dipendenze su catalogo, modello dati, validazioni,
+- `npm run check` — 46 test senza dipendenze su catalogo, modello dati, validazioni,
   motore di scoring (incl. pacchetto fittizio di collaudo usato solo nei test),
   profilo, regole adattive, referto, import/migrazione e vincoli (nessuna risorsa
   esterna, nessun cut-off nel codice, nessun termine diagnostico nei testi generati).
 - `node smoke.js` — end-to-end opzionale in Chromium (richiede `playwright-core`):
-  percorso completo dei 7 passi su desktop, tablet e smartphone, cronometro,
-  validazioni, persistenza dopo ricarica, tocchi ≥44 px, zero errori console.
+  percorso completo degli 8 passi (incluso il confronto longitudinale con la coppia
+  demo) su desktop, tablet e smartphone, cronometro, validazioni, persistenza dopo
+  ricarica, tocchi ≥44 px, zero errori console.
 
 ## Limiti noti
 
-- Confronto longitudinale tra valutazioni non ancora implementato (sezione presente
-  nel referto come promemoria).
+- Il confronto longitudinale è puramente descrittivo: senza correzioni per effetto
+  pratica né indici di cambiamento affidabile (RCI), che potranno entrare in futuro
+  tramite i pacchetti normativi.
 - PDF tramite stampa del browser (niente impaginazione dedicata).
 - localStorage non cifrato; autenticazione/ruoli/audit richiederanno un backend
   (architettura predisposta: logica pura separata, dati esportabili in JSON).
