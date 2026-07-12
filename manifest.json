@@ -1,0 +1,15 @@
+{
+  "name": "NeuroScreen Clinico",
+  "short_name": "NeuroScreen",
+  "description": "Prototipo locale di valutazione neuropsicologica guidata. Nessun dato lascia il dispositivo.",
+  "lang": "it",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f5f7f9",
+  "theme_color": "#0b5cad",
+  "icons": [
+    { "src": "icona-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icona-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
