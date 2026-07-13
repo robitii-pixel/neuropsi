@@ -218,7 +218,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v17";
+const APPV="v18";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -456,6 +456,16 @@ const ORIENT_PATHS={
   autonomia:{label:"Riduzione dell'autonomia",domini:["autonomia"],complementi:["mem-verbale","esecutive","visuospaziale","comportamento"],domanda:"Quali attività sono cambiate e quali fattori cognitivi, motori, sensoriali o ambientali possono spiegarlo?"}
 };
 function trainingPath(id){return ORIENT_PATHS[id]||ORIENT_PATHS.globale;}
+function combinedInitialPath(ids){
+  const order=Object.keys(ORIENT_PATHS);
+  const clean=order.filter(id=>(ids||[]).includes(id));
+  const chosen=clean.length?clean:["globale"];
+  const paths=chosen.map(id=>ORIENT_PATHS[id]);
+  const domini=[...new Set(paths.flatMap(p=>p.domini))];
+  const complementi=[...new Set(paths.flatMap(p=>p.complementi))].filter(d=>!domini.includes(d));
+  return {problemi:chosen,label:paths.map(p=>p.label).join(" + "),domini,complementi,
+    domanda:paths.map(p=>p.domanda).join(" ")};
+}
 function trainingDomain(id){return TRAINING_DOMAINS[id]||{nome:domName(id),cosa:"Esplora il dominio indicato.",lettura:"Integrare sempre più fonti e condizioni di validità.",esempio:"Un singolo risultato non basta per una conclusione clinica."};}
 
 /* Profili interamente simulati: formulazioni funzionali descrittive,
@@ -1654,7 +1664,7 @@ function viewRegistro(){
   </div>`;
 }
 
-let trainingChoice="memoria";
+const trainingChoices=new Set(["memoria"]);
 const trainingResults={};
 const combinedSelected=new Set(["mem-verbale","esecutive"]);
 let combinedAutonomy="conservata";
@@ -1729,11 +1739,11 @@ function combinedBuilder(){
   </div>`;
 }
 function viewFormazione(){
-  const path=trainingPath(trainingChoice);const tests=trainingTests(path);
+  const path=combinedInitialPath([...trainingChoices]);const tests=trainingTests(path);
   const domPrincipali=path.domini.map(trainingDomain);
   const domComplementari=path.complementi.map(trainingDomain);
   const pathButtons=Object.entries(ORIENT_PATHS).map(([id,p])=>
-    `<button class="${trainingChoice===id?"on":""}" data-action="training-path" data-id="${id}">${esc(p.label)}</button>`).join("");
+    `<button class="${trainingChoices.has(id)?"on":""}" data-action="training-path" data-id="${id}" aria-pressed="${trainingChoices.has(id)}">${esc(p.label)}</button>`).join("");
   const exercises=Object.keys(ADMIN_TESTS).map(tid=>{
     const t=TEST_BY_ID[tid];return `<div class="training-card"><h4>${esc(t.nome)}</h4>
       <p class="muted">Allenamento alla consegna, alla gestione del tempo e all'osservazione degli errori.</p>
@@ -1743,7 +1753,8 @@ function viewFormazione(){
     <h3>Orientamento alla valutazione neuropsicologica</h3>
     <p>Parti dal quesito, controlla le condizioni di validità, individua i domini e solo dopo
     considera gli strumenti. Questa mappa è formativa: non prescrive una batteria per una persona reale.</p>
-    <h4>1. Qual è il problema iniziale?</h4>
+    <h4>1. Quali sono i problemi iniziali?</h4>
+    <p class="muted small">Puoi selezionarne più di uno. La mappa unirà i domini senza considerare automaticamente più grave il problema selezionato per primo.</p>
     <div class="training-paths">${pathButtons}</div>
     <div class="flow" aria-label="Mappa di orientamento didattico">
       <div class="node active"><strong>1. Quesito</strong><br>${esc(path.label)}</div>
@@ -2562,7 +2573,14 @@ const ACTIONS={
   },
   "cards-open":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=true;});},
   "cards-close":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=false;});},
-  "training-path":btn=>{trainingChoice=btn.dataset.id;render();window.scrollTo(0,0);},
+  "training-path":btn=>{
+    const id=btn.dataset.id;if(!ORIENT_PATHS[id])return;
+    if(trainingChoices.has(id)){
+      if(trainingChoices.size===1){toast("Mantieni almeno un problema iniziale.");return;}
+      trainingChoices.delete(id);
+    }else trainingChoices.add(id);
+    render();
+  },
   "combo-domain":btn=>{
     const id=btn.dataset.id;if(!COMBO_DOMAIN_IDS.includes(id))return;
     if(combinedSelected.has(id))combinedSelected.delete(id);else combinedSelected.add(id);

@@ -26,7 +26,7 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
   "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
   "ADMIN_NOTA","ADMIN_VERSIONE","ADMIN_TESTS","mulberry32","genDigits","spanInit","spanNext",
-  "TRAINING_DOMAINS","ORIENT_PATHS","trainingPath","trainingDomain",
+  "TRAINING_DOMAINS","ORIENT_PATHS","trainingPath","combinedInitialPath","trainingDomain",
   "SIM_PROFILES","simProfile",
   "COMBO_DOMAIN_IDS","combinedTeaching",
   "CANC_TARGET","genCanc","cancResult","ORIENT_DOMANDE","orientResult",
@@ -624,6 +624,16 @@ t("orientamento didattico: percorsi, domini e fallback completi",()=>{
   ok(L.trainingDomain("mem-verbale").lettura.length>60);
   ok(/slice\(0,12\)/.test(html),"le schede formative non hanno un limite mobile");
 });
+t("problemi iniziali combinati: unisce domini e rimuove duplicati",()=>{
+  const p=L.combinedInitialPath(["memoria","esecutive","autonomia"]);
+  eq(p.problemi,["memoria","esecutive","autonomia"]);
+  ok(p.label.includes("Difficoltà di memoria")&&p.label.includes("Riduzione dell'autonomia"));
+  ["mem-verbale","mem-visiva","mdl","esecutive","autonomia"].forEach(d=>ok(p.domini.includes(d),"dominio mancante: "+d));
+  eq(new Set(p.domini).size,p.domini.length,"domini duplicati");
+  ok(!p.complementi.some(d=>p.domini.includes(d)),"dominio ripetuto tra principali e complementari");
+  const fallback=L.combinedInitialPath([]);eq(fallback.problemi,["globale"]);
+  const ripulito=L.combinedInitialPath(["memoria","memoria","inesistente"]);eq(ripulito.problemi,["memoria"]);
+});
 t("profili simulati: ipotesi funzionali complete e mai eziologiche automatiche",()=>{
   ok(L.SIM_PROFILES.length>=8,"servono almeno otto profili didattici");
   const ids=new Set();
@@ -728,6 +738,7 @@ t("HTML: percorso formativo ed esercitazioni separati dal registro",()=>{
   ok(/function simProfileCard\(/.test(html),"manca la resa dei casi simulati");
   ok(/Componi un profilo multidominio/.test(html),"manca il compositore multidominio");
   ["combo-domain","combo-autonomy","combo-validity"].forEach(a=>ok(html.includes('data-action="'+a+'"'),"manca l'azione "+a));
+  ok(/Quali sono i problemi iniziali/.test(html)&&/trainingChoices\.has/.test(html),"i problemi iniziali non sono multiselezionabili");
 });
 t("HTML: navigazione principale separa formazione e registro",()=>{
   ok(html.includes('id="modebar"'),"manca la barra delle aree");

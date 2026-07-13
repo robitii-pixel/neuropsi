@@ -48,6 +48,14 @@ attentivo-dysexecutive rallentato, amnestico-linguistico o visuospaziale-prassic
 validità è insufficiente la formulazione viene sospesa; la distinzione lieve/maggiore segue
 lo scenario di autonomia e resta esplicitamente didattica, non diagnostica.
 
+## Problemi iniziali combinati (v18)
+
+Il primo passaggio della flow chart è multiselezione: memoria, disattenzione/lentezza,
+linguaggio, disorganizzazione/rigidità, visuospaziale/prassico, cambiamento globale,
+umore/comportamento e autonomia possono essere scelti contemporaneamente. La mappa unisce
+i domini principali, elimina i duplicati, separa quelli complementari e aggiorna le schede
+pertinenti. L'ordine di selezione non attribuisce priorità o gravità clinica.
+
 ## Percorso clinico (8 passi)
 
 1. **Sessione e quesito** — codice pseudonimo obbligatorio; età, sesso, scolarità,
