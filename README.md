@@ -22,6 +22,14 @@ con un doppio clic in qualunque browser moderno, anche offline.
 - Il precedente registro resta accessorio per organizzare risultati ottenuti separatamente
   con materiali originali, autorizzazioni e norme appropriate.
 
+## Aree separate (v15)
+
+Formazione e registro professionale sono due ambienti distinti. La pagina iniziale presenta
+solo le due scelte; una barra superiore sempre visibile permette di passare direttamente da
+un'area all'altra. Nel percorso didattico non vengono mostrati né la sessione attiva né gli
+otto passi clinici. Il registro mantiene casi, profili e referti senza mescolarli alle schede
+formative.
+
 ## Percorso clinico (8 passi)
 
 1. **Sessione e quesito** — codice pseudonimo obbligatorio; età, sesso, scolarità,

@@ -30,7 +30,7 @@ const VIEWPORTS=[
     ok((await page.textContent("body")).includes("non un test neuropsicologico"),"avviso di uso didattico");
 
     // percorso formativo separato dal registro
-    await page.click('button[data-view="formazione"]');
+    await page.click('#modebar button[data-view="formazione"]');
     ok((await page.textContent("main")).includes("Orientamento alla valutazione neuropsicologica"),"percorso formativo aperto");
     await page.click('button[data-action="training-path"][data-id="linguaggio"]');
     ok((await page.textContent("main")).includes("Difficoltà linguistiche"),"mappa linguaggio selezionata");
@@ -38,7 +38,7 @@ const VIEWPORTS=[
     await page.click('button[data-action="admin-count"][data-id="fluenza-fon"][data-kind="v"]');
     await page.click('button[data-action="admin-stop"][data-id="fluenza-fon"]');
     ok((await page.textContent("main")).includes("Dato non clinico"),"esercitazione marcata come non clinica");
-    await page.click('button[data-view="home"]');
+    await page.click('#modebar button[data-view="registro"]');
 
     // validazione codice
     await page.fill("#newCode","nome cognome");

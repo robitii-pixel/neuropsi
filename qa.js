@@ -697,6 +697,13 @@ t("HTML: percorso formativo ed esercitazioni separati dal registro",()=>{
   ok(/trainingResults\[tid\]=/.test(html),"il risultato didattico non resta separato");
   ok(!/e\.versioneProva=ADMIN_VERSIONE/.test(html),"il risultato didattico scrive ancora nella prova clinica");
 });
+t("HTML: navigazione principale separa formazione e registro",()=>{
+  ok(html.includes('id="modebar"'),"manca la barra delle aree");
+  ok(/function viewRegistro\(/.test(html),"manca la vista autonoma del registro");
+  ok(/Percorso didattico[\s\S]*Registro professionale/.test(html),"mancano le due scelte principali");
+  ok(/\["home","registro","formazione"\]\.includes\(currentView\)/.test(html),"lo stepper clinico non viene nascosto nelle aree generali");
+  ok(/s&&dentroRegistro/.test(html),"la sessione resta visibile fuori dal registro");
+});
 
 /* ---------- vincoli sull'HTML ---------- */
 t("HTML: nessuna risorsa esterna, nessuna chiamata di rete",()=>{

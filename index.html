@@ -27,6 +27,13 @@ a{color:var(--brand)}
 .topbar .ver{font-size:.8rem;opacity:.85;border:1px solid rgba(255,255,255,.5);border-radius:999px;padding:.05rem .5rem}
 .topbar .demo-tag{font-size:.75rem;background:#fff;color:var(--bad);border-radius:999px;padding:.1rem .55rem;font-weight:700}
 .topbar .sess{margin-left:auto;font-size:.9rem;background:rgba(255,255,255,.15);border-radius:8px;padding:.2rem .6rem;max-width:15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modebar{max-width:980px;margin:.75rem auto 0;padding:0 1rem;display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem}
+.modebar button{font-weight:650;border:2px solid var(--line);background:var(--card)}
+.modebar button.active{border-color:var(--brand);color:var(--brand);background:#e7f0fa}
+.mode-choice{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
+.mode-choice .card{margin:0;border-width:2px;display:flex;flex-direction:column}
+.mode-choice .card p{flex:1}
+@media(max-width:640px){.modebar{grid-template-columns:1fr}.mode-choice{grid-template-columns:1fr}}
 main{max-width:980px;margin:0 auto;padding:1rem 1rem 5rem}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem;margin:0 0 1rem}
 .card h3{margin-top:0}
@@ -166,7 +173,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
 .print-only{display:none}
 @media print{
   body{background:#fff}
-  .no-print,.topbar,.stepper,main,.disclaimer,#toasts{display:none !important}
+  .no-print,.topbar,.modebar,.stepper,main,.disclaimer,#toasts{display:none !important}
   .print-only{display:block;font:10.5pt/1.4 Georgia,serif;color:#000;padding:0}
   .print-only .report-head{display:flex;justify-content:space-between;border-bottom:2px solid #222;margin-bottom:10mm;padding-bottom:3mm}
   .print-only table{width:100%;border-collapse:collapse;font-size:9pt;margin:4mm 0 7mm}
@@ -184,6 +191,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
   <span class="sess" id="topSess" hidden></span>
 </header>
 
+<nav class="modebar no-print" id="modebar" aria-label="Aree dell'app"></nav>
 <nav class="stepper no-print" id="stepper" aria-label="Percorso clinico"></nav>
 
 <main id="app"></main>
@@ -210,7 +218,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v14";
+const APPV="v15";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -1458,7 +1466,8 @@ function stepDisabledMsg(id){
 }
 function renderStepper(){
   const nav=$("#stepper");const s=cur();
-  if(!s){nav.innerHTML="";return;}
+  if(!s||["home","registro","formazione"].includes(currentView)){nav.innerHTML="";nav.hidden=true;return;}
+  nav.hidden=false;
   const doneMap={
     sessione:!validateCode(s.code)&&Object.keys(validateAnagrafica(s.anagrafica)).length===0&&!!(s.quesito.quesitoClinico||"").trim(),
     validita:Object.keys(s.validita.valori||{}).some(k=>s.validita.valori[k]>0),
@@ -1477,6 +1486,15 @@ function renderStepper(){
       <span class="n">${st.n}</span>${st.label}</button>`;
   }).join("");
 }
+function renderModeNav(){
+  const area=currentView==="formazione"?"formazione":
+    (["home"].includes(currentView)?"home":"registro");
+  $("#modebar").innerHTML=[
+    ["home","Scelta iniziale"],
+    ["formazione","Percorso didattico"],
+    ["registro","Registro professionale"]
+  ].map(([id,label])=>`<button class="${area===id?"active":""}" data-action="goto" data-view="${id}" aria-current="${area===id?"page":"false"}">${label}</button>`).join("");
+}
 
 /* ---------- Render ---------- */
 function render(){
@@ -1484,21 +1502,23 @@ function render(){
   const s=cur();
   $("#appver").textContent=APPV;
   const top=$("#topSess");
-  if(s){top.hidden=false;top.textContent="Sessione: "+(s.code||"(senza codice)");}
+  const dentroRegistro=!["home","registro","formazione"].includes(currentView);
+  if(s&&dentroRegistro){top.hidden=false;top.textContent="Sessione: "+(s.code||"(senza codice)");}
   else top.hidden=true;
+  renderModeNav();
   renderStepper();
-  const views={home:viewHome,formazione:viewFormazione,sessione:viewSessione,validita:viewValidita,batteria:viewBatteria,
+  const views={home:viewHome,registro:viewRegistro,formazione:viewFormazione,sessione:viewSessione,validita:viewValidita,batteria:viewBatteria,
     prove:viewProve,profilo:viewProfilo,secondo:viewSecondo,confronto:viewConfronto,referto:viewReferto};
   $("#app").innerHTML=(views[currentView]||viewHome)();
 }
 function go(view){
-  if(view!=="home"&&view!=="formazione"&&!cur()){currentView="home";render();return;}
-  if(view!=="home"&&view!=="formazione"&&!stepEnabled(view)){toast(stepDisabledMsg(view)||"Passaggio non ancora disponibile.");return;}
+  if(!["home","registro","formazione"].includes(view)&&!cur()){currentView="registro";render();return;}
+  if(!["home","registro","formazione"].includes(view)&&!stepEnabled(view)){toast(stepDisabledMsg(view)||"Passaggio non ancora disponibile.");return;}
   currentView=view;render();window.scrollTo(0,0);
 }
 function navRow(prev,next,nextLabel,extra){
   return `<div class="btnrow">
-    ${prev?`<button data-action="goto" data-view="${prev}">Indietro</button>`:`<button data-action="goto" data-view="home">Elenco sessioni</button>`}
+    ${prev?`<button data-action="goto" data-view="${prev}">Indietro</button>`:`<button data-action="goto" data-view="registro">Elenco sessioni</button>`}
     <span class="spacer"></span>
     <span class="muted small savedFlag">Salvato sul dispositivo</span>
     ${extra||""}
@@ -1508,6 +1528,29 @@ function navRow(prev,next,nextLabel,extra){
 
 /* ---------- Viste ---------- */
 function viewHome(){
+  return `<div class="card">
+    <h3>Scegli dove lavorare</h3>
+    <p class="muted">Le due aree sono separate. Puoi passare dall'una all'altra in qualsiasi
+    momento usando i tre pulsanti in alto.</p>
+    <div class="mode-choice">
+      <div class="card lv1">
+        <h3>Percorso didattico</h3>
+        <p>Flow chart, domini cognitivi, schede sul significato clinico ed esercitazioni
+        originali che non producono dati clinici.</p>
+        <button class="primary" data-action="goto" data-view="formazione">Entra nella formazione</button>
+      </div>
+      <div class="card lv2">
+        <h3>Registro professionale</h3>
+        <p>Casi, risultati ottenuti con strumenti autorizzati, profilo per domini,
+        confronto e bozza di referto.</p>
+        <button data-action="goto" data-view="registro">Apri il registro</button>
+      </div>
+    </div>
+    <div class="banner warn" style="margin-top:1rem"><strong>Separazione netta:</strong>
+    le esercitazioni didattiche non compilano il registro e non entrano nel profilo o nel referto.</div>
+  </div>`;
+}
+function viewRegistro(){
   const list=Object.values(state.sessions).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
   const rows=list.map(s=>{
     const n=(s.batteria||[]).length;
@@ -1527,19 +1570,9 @@ function viewHome(){
   const nNorme=(state.normPacks||[]).length;
   const nMateriali=(state.materialPacks||[]).length;
   return `
-  <div class="banner info"><strong>Nuovo scopo principale: orientamento e formazione.</strong>
-  L'app aiuta a capire quale dominio esplorare, quali famiglie di prove considerare e come leggere
-  qualitativamente i risultati. Non sceglie una batteria per un paziente e non sostituisce manuali,
-  formazione, licenze o giudizio clinico.</div>
-  <div class="card lv1">
-    <h3>Percorso di orientamento e addestramento</h3>
-    <p>Scegli il problema iniziale, segui la mappa dei domini, consulta le schede dei test e prova
-    esercitazioni originali che non generano dati clinici.</p>
-    <div class="btnrow"><button class="primary" data-action="goto" data-view="formazione">Apri il percorso didattico</button></div>
-  </div>
-  <div class="banner warn"><strong>Il registro sottostante è solo accessorio.</strong>
-  Può organizzare dati ottenuti altrove con strumenti legittimamente disponibili, ma le
-  esercitazioni dell'app non entrano nel profilo né nella sintesi.</div>
+  <div class="banner info"><strong>Registro professionale.</strong> Qui organizzi casi e risultati
+  ottenuti con strumenti originali legittimamente disponibili. Per tornare alle spiegazioni e
+  alle esercitazioni usa “Percorso didattico” nella barra superiore.</div>
   <div class="card">
     <h3>Nuovo caso di ragionamento o registro autorizzato</h3>
     <p class="muted small">Identificare il paziente SOLO con un codice pseudonimo (es. "NP-2026-014").
@@ -2232,7 +2265,7 @@ function viewReferto(){
     <div class="btnrow">
       <button data-action="goto" data-view="secondo">Indietro</button>
       <button data-action="export-one" data-id="${s.id}">Esporta valutazione (JSON)</button>
-      <button data-action="goto" data-view="home">Chiudi e torna all'elenco</button>
+      <button data-action="goto" data-view="registro">Chiudi e torna all'elenco</button>
       <span class="spacer"></span>
       <span class="muted small savedFlag">Salvato sul dispositivo</span>
     </div>
