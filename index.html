@@ -218,7 +218,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v15";
+const APPV="v16";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -457,6 +457,20 @@ const ORIENT_PATHS={
 };
 function trainingPath(id){return ORIENT_PATHS[id]||ORIENT_PATHS.globale;}
 function trainingDomain(id){return TRAINING_DOMAINS[id]||{nome:domName(id),cosa:"Esplora il dominio indicato.",lettura:"Integrare sempre più fonti e condizioni di validità.",esempio:"Un singolo risultato non basta per una conclusione clinica."};}
+
+/* Profili interamente simulati: formulazioni funzionali descrittive,
+   mai diagnosi eziologiche e mai applicabili automaticamente a casi reali. */
+const SIM_PROFILES=[
+  {id:"lieve-amnestico",titolo:"Profilo amnestico con autonomia conservata",scenario:"Persona di 69 anni con dimenticanze progressive riferite da 18 mesi; mantiene gestione di denaro, farmaci, appuntamenti e spostamenti, usando più promemoria.",validita:"Collaborazione adeguata; vista e udito corretti; umore senza interferenze rilevanti.",pattern:["Apprendimento verbale ridotto","Richiamo differito ridotto","Riconoscimento parzialmente utile","Altri domini sostanzialmente conservati"],autonomia:"Attività quotidiane indipendenti, con strategie compensative più frequenti.",ipotesi:"Possibile disturbo neurocognitivo lieve a prevalenza amnestica.",perche:"È presente un declino cognitivo oggettivo, ma non emerge una perdita sostanziale dell'indipendenza quotidiana.",alternative:["Effetti di farmaci o disturbi del sonno","Disturbo dell'umore","Condizione neurologica o sistemica da definire"],passi:["Confermare decorso e autonomia con informatore","Integrare memoria verbale e visiva","Valutazione neurologica ed eziologica","Follow-up longitudinale"]},
+  {id:"maggiore-amnestico",titolo:"Profilo amnestico con perdita di autonomia",scenario:"Persona di 77 anni con ripetitività, disorientamento temporale e progressiva necessità di supervisione.",validita:"Dati attendibili e convergenti tra colloquio, informatore e osservazione.",pattern:["Apprendimento e ritenzione marcatamente ridotti","Scarso beneficio dal riconoscimento","Disorientamento temporale","Difficoltà esecutive secondarie"],autonomia:"Non gestisce più farmaci e finanze in sicurezza; necessita supervisione negli spostamenti nuovi.",ipotesi:"Possibile disturbo neurocognitivo maggiore a prevalenza amnestica.",perche:"Il declino cognitivo interferisce con attività strumentali essenziali e riduce l'indipendenza.",alternative:["Eziologia neurodegenerativa","Contributo cerebrovascolare","Cause metaboliche, farmacologiche o sistemiche"],passi:["Valutare sicurezza e supporto familiare","Completare studio neurologico ed eziologico","Documentare ADL/IADL e capacità decisionali specifiche","Programmare follow-up e interventi assistenziali"]},
+  {id:"disesecutivo",titolo:"Profilo disesecutivo-rallentato",scenario:"Persona di 72 anni con lentezza, difficoltà a organizzare attività complesse e numerose omissioni nella vita quotidiana.",validita:"Motricità rallentata: tempi interpretati separando componente motoria e cognitiva.",pattern:["Velocità di elaborazione ridotta","Flessibilità e inibizione fragili","Memoria libera debole ma riconoscimento conservato","Perseverazioni e scarsa generazione strategica"],autonomia:"Autonoma nelle attività di base; necessita aiuto per pratiche amministrative e pianificazione complessa.",ipotesi:"Possibile disturbo neurocognitivo almeno lieve, multidominio a prevalenza disesecutivo-rallentata.",perche:"Il pattern suggerisce difficoltà di controllo e recupero strategico; il livello lieve o maggiore dipende dall'effettiva perdita di indipendenza.",alternative:["Contributo cerebrovascolare","Sindrome parkinsoniana o altra condizione sottocorticale","Farmaci, apatia, depressione o rallentamento motorio"],passi:["Precisare autonomia premorbosa e attuale","Confrontare compiti a tempo e non a tempo","Integrare esame neurologico e neuroimaging","Valutare sonno, farmaci e fattori vascolari"]},
+  {id:"linguistico",titolo:"Profilo focale a prevalenza linguistica",scenario:"Persona di 64 anni con progressiva difficoltà nel reperire parole, discorso informativo ridotto e autonomia pratica inizialmente conservata.",validita:"Lingua madre italiana; udito adeguato; comprensione delle consegne verificata.",pattern:["Denominazione ridotta con circonlocuzioni","Fluenza verbale ridotta","Memoria non verbale relativamente conservata","Variabile coinvolgimento di ripetizione o comprensione"],autonomia:"Gestione quotidiana conservata, ma crescente impatto comunicativo e lavorativo.",ipotesi:"Possibile disturbo cognitivo lieve o focale a prevalenza linguistica.",perche:"La formulazione descrive il dominio prevalente; non basta per diagnosticare una specifica afasia progressiva o stabilirne l'eziologia.",alternative:["Disturbo afasico acquisito non progressivo","Fattori uditivi, linguistici o culturali","Condizione neurodegenerativa focale da caratterizzare"],passi:["Definire esordio e progressione","Analisi neurolinguistica estesa","Valutare memoria visiva, prassie e funzioni esecutive","Integrare imaging e valutazione neurologica"]},
+  {id:"visuospaziale",titolo:"Profilo focale visuospaziale-prassico",scenario:"Persona di 66 anni con difficoltà a orientarsi, localizzare oggetti e organizzare attività visuocostruttive.",validita:"Acuità visiva e campo visivo da verificare prima dell'interpretazione cognitiva.",pattern:["Esplorazione visiva disorganizzata","Copia frammentaria","Giudizi spaziali ridotti","Memoria verbale relativamente conservata"],autonomia:"Difficoltà nella guida, negli spostamenti e nell'uso sicuro di strumenti complessi.",ipotesi:"Possibile disturbo neurocognitivo a prevalenza visuospaziale-prassica; gravità da definire sull'autonomia.",perche:"Il profilo funzionale indica il sistema maggiormente compromesso, ma non identifica da solo una sindrome o eziologia specifica.",alternative:["Deficit visivo o oculomotorio","Neglect o esiti focali","Condizione neurodegenerativa posteriore da caratterizzare"],passi:["Esame visivo e neurologico","Distinguere percezione, esplorazione, costruzione e prassia","Valutare sicurezza nella guida e negli spostamenti","Integrare neuroimaging"]},
+  {id:"interferenze",titolo:"Prestazione condizionata da umore, sonno e fatica",scenario:"Persona di 58 anni con lamentele diffuse, insonnia, ansia elevata e marcata variabilità giornaliera.",validita:"Affaticamento crescente, rallentamento e numerose rinunce; validità clinica parziale.",pattern:["Prestazioni variabili","Rallentamento senza pattern stabile","Miglioramento con incoraggiamento o pause","Memoria di riconoscimento relativamente conservata"],autonomia:"Sostanzialmente conservata, ma ridotta efficienza soggettiva e lavorativa.",ipotesi:"Profilo cognitivo non conclusivo, verosimilmente condizionato da fattori affettivi e di stato.",perche:"Non è appropriato formulare automaticamente un disturbo neurocognitivo quando interferenze rilevanti limitano l'interpretabilità.",alternative:["Disturbo dell'umore o d'ansia","Disturbo del sonno","Effetti farmacologici o condizioni mediche","Coesistenza di una condizione neurologica"],passi:["Trattare o stabilizzare i fattori interferenti","Raccogliere dati funzionali da fonti indipendenti","Ripetere una valutazione mirata in condizioni migliori","Non attribuire tutto all'umore senza adeguato studio medico"]},
+  {id:"funzionale",titolo:"Possibile disturbo cognitivo funzionale",scenario:"Persona di 52 anni con convinzione di grave perdita di memoria, ma continua a svolgere un lavoro complesso; descrizioni e prestazioni mostrano marcate incoerenze interne.",validita:"Impegno sufficiente; emergono discrepanze riproducibili tra funzionamento automatico e prestazione richiesta esplicitamente.",pattern:["Sintomi soggettivi severi rispetto al funzionamento osservato","Incoerenza interna positiva","Prestazioni migliori quando l'attenzione non è focalizzata sul sintomo","Assenza di un pattern neurocognitivo stabile"],autonomia:"Capacità reali più conservate di quanto percepito, con forte distress e ricorso a controlli ripetuti.",ipotesi:"Quadro compatibile con possibile disturbo cognitivo funzionale, da formulare solo su segni positivi.",perche:"Test nei limiti o ansia non bastano: servono incoerenza interna caratteristica, distress e valutazione delle alternative; può coesistere altra patologia.",alternative:["Disturbo dell'umore, ansia o trauma","Sonno, dolore, farmaci o condizioni sistemiche","Fase iniziale di patologia neurologica","Simulazione intenzionale: non deducibile automaticamente"] ,passi:["Spiegare i segni positivi con linguaggio non stigmatizzante","Valutare comorbidità e fattori perpetuanti","Evitare rassicurazioni generiche basate solo sui punteggi","Follow-up se il decorso cambia"]},
+  {id:"acuto",titolo:"Cambiamento acuto e fluttuante: fermare la valutazione",scenario:"Persona di 81 anni inviata durante ricovero; da due giorni alterna sonnolenza, agitazione, disorientamento e difficoltà a seguire richieste.",validita:"Vigilanza fluttuante e rapido cambiamento rispetto al funzionamento abituale.",pattern:["Attenzione marcatamente instabile","Disorientamento variabile","Risposte rallentate o incoerenti","Possibili alterazioni percettive e del ritmo sonno-veglia"],autonomia:"Peggioramento improvviso rispetto alla settimana precedente.",ipotesi:"Valutazione neuropsicologica non interpretabile; possibile delirium o stato confusionale acuto da valutare con urgenza.",perche:"L'esordio in ore o giorni e la fluttuazione richiedono accertamento medico della causa, non una diagnosi neurocognitiva cronica basata sui test.",alternative:["Infezione o squilibrio metabolico","Effetti o sospensione di farmaci","Dolore, disidratazione o ritenzione","Evento neurologico acuto"],passi:["Interrompere la valutazione estesa","Attivare valutazione medica tempestiva","Raccogliere baseline da caregiver e cartella","Rivalutare la cognizione dopo la risoluzione del quadro acuto"],allerta:true}
+];
+function simProfile(id){return SIM_PROFILES.find(p=>p.id===id)||null;}
 /* generatore deterministico: con lo stesso seme produce la stessa serie */
 function mulberry32(seed){
   let a=seed>>>0;
@@ -1654,6 +1668,26 @@ function trainingCard(t){
     ${g.officialUrl?`<p><a href="${esc(g.officialUrl)}" target="_blank" rel="noopener">Apri la fonte ufficiale</a></p>`:""}
   </div>`;
 }
+function simProfileCard(p){
+  return `<details class="test-card sim-profile">
+    <summary><span class="nm">${esc(p.titolo)}</span>
+      <span class="badge ${p.allerta?"deficit":"lv2b"}">${p.allerta?"priorità medica":"caso simulato"}</span></summary>
+    <div class="body">
+      <div class="banner ${p.allerta?"error":"info"}"><strong>Ipotesi funzionale:</strong> ${esc(p.ipotesi)}</div>
+      <p><strong>Scenario:</strong> ${esc(p.scenario)}</p>
+      <p><strong>Condizioni di validità:</strong> ${esc(p.validita)}</p>
+      <p><strong>Pattern simulato:</strong></p><ul>${p.pattern.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      <p><strong>Autonomia:</strong> ${esc(p.autonomia)}</p>
+      <p><strong>Perché questa ipotesi:</strong> ${esc(p.perche)}</p>
+      <div class="grid2"><div><p><strong>Alternative da considerare:</strong></p>
+        <ul>${p.alternative.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+        <div><p><strong>Passi successivi:</strong></p>
+        <ul>${p.passi.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div></div>
+      <p class="muted small">Caso interamente inventato. La formulazione è descrittiva e non
+      identifica automaticamente una causa, una malattia o una diagnosi applicabile a persone reali.</p>
+    </div>
+  </details>`;
+}
 function viewFormazione(){
   const path=trainingPath(trainingChoice);const tests=trainingTests(path);
   const domPrincipali=path.domini.map(trainingDomain);
@@ -1689,7 +1723,11 @@ function viewFormazione(){
     <p class="muted small">Le schede spiegano scopo e significato; non mostrano item protetti,
     consegne standardizzate, tavole, norme o soglie.</p>
     <div class="training-grid">${tests.map(trainingCard).join("")}</div>
-    <h4 style="margin-top:1rem">4. Palestra di conduzione</h4>
+    <h4 style="margin-top:1rem">4. Profili simulati con ipotesi funzionali</h4>
+    <p>Apri un caso per confrontare pattern cognitivo, autonomia, condizioni di validità,
+    possibili alternative e passi successivi. Nessun profilo formula una diagnosi eziologica.</p>
+    ${SIM_PROFILES.map(simProfileCard).join("")}
+    <h4 style="margin-top:1rem">5. Palestra di conduzione</h4>
     <p>Queste esercitazioni usano stimoli creati dall'app. Il risultato resta solo sullo schermo,
     non viene salvato e non entra in profili, confronti o sintesi.</p>
     <div class="training-grid">${exercises}</div>

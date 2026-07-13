@@ -30,6 +30,15 @@ un'area all'altra. Nel percorso didattico non vengono mostrati né la sessione a
 otto passi clinici. Il registro mantiene casi, profili e referti senza mescolarli alle schede
 formative.
 
+## Profili simulati (v16)
+
+Il percorso didattico include otto casi interamente inventati: profilo amnestico lieve e
+maggiore, disesecutivo-rallentato, linguistico, visuospaziale-prassico, condizionato da
+umore/sonno/fatica, possibile disturbo cognitivo funzionale e cambiamento acuto fluttuante.
+Ogni caso separa pattern, autonomia, validità, ipotesi funzionale, alternative e passi
+successivi. Le formulazioni non attribuiscono automaticamente un'eziologia; il caso acuto
+indica di interrompere i test e attivare una valutazione medica tempestiva.
+
 ## Percorso clinico (8 passi)
 
 1. **Sessione e quesito** — codice pseudonimo obbligatorio; età, sesso, scolarità,

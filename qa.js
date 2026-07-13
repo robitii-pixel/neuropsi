@@ -27,6 +27,7 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
   "ADMIN_NOTA","ADMIN_VERSIONE","ADMIN_TESTS","mulberry32","genDigits","spanInit","spanNext",
   "TRAINING_DOMAINS","ORIENT_PATHS","trainingPath","trainingDomain",
+  "SIM_PROFILES","simProfile",
   "CANC_TARGET","genCanc","cancResult","ORIENT_DOMANDE","orientResult",
   "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport","buildStructuredReport",
   "exportPayload","sanitizeSession","migrateV1","parseImport","demoSession","demoSessions","nowISO","uid"];
@@ -622,6 +623,19 @@ t("orientamento didattico: percorsi, domini e fallback completi",()=>{
   ok(L.trainingDomain("mem-verbale").lettura.length>60);
   ok(/slice\(0,12\)/.test(html),"le schede formative non hanno un limite mobile");
 });
+t("profili simulati: ipotesi funzionali complete e mai eziologiche automatiche",()=>{
+  ok(L.SIM_PROFILES.length>=8,"servono almeno otto profili didattici");
+  const ids=new Set();
+  L.SIM_PROFILES.forEach(p=>{
+    ok(p.id&&!ids.has(p.id),"id duplicato: "+p.id);ids.add(p.id);
+    ["titolo","scenario","validita","autonomia","ipotesi","perche"].forEach(k=>ok(p[k]&&p[k].length>20,"campo povero "+k+" in "+p.id));
+    ok(p.pattern.length>=4&&p.alternative.length>=3&&p.passi.length>=3,"liste incomplete in "+p.id);
+    ok(!/diagnosi (di|da) (Alzheimer|Parkinson|Lewy)/i.test(p.ipotesi),"diagnosi eziologica automatica in "+p.id);
+  });
+  ok(L.simProfile("funzionale").perche.includes("Test nei limiti o ansia non bastano"));
+  ok(L.simProfile("acuto").allerta&&/urgenza/i.test(L.simProfile("acuto").ipotesi));
+  eq(L.simProfile("inesistente"),null);
+});
 t("mulberry32: deterministico per seme, diverso tra semi",()=>{
   const a=L.mulberry32(42),b=L.mulberry32(42),c=L.mulberry32(43);
   const va=[a(),a(),a()],vb=[b(),b(),b()],vc=[c(),c(),c()];
@@ -696,6 +710,8 @@ t("HTML: percorso formativo ed esercitazioni separati dal registro",()=>{
   ok(!/\$\{adminPanel\(tid,e\)\}/.test(html),"l'esercitazione compare ancora nel registro clinico");
   ok(/trainingResults\[tid\]=/.test(html),"il risultato didattico non resta separato");
   ok(!/e\.versioneProva=ADMIN_VERSIONE/.test(html),"il risultato didattico scrive ancora nella prova clinica");
+  ok(/Profili simulati con ipotesi funzionali/.test(html),"manca la sezione dei profili simulati");
+  ok(/function simProfileCard\(/.test(html),"manca la resa dei casi simulati");
 });
 t("HTML: navigazione principale separa formazione e registro",()=>{
   ok(html.includes('id="modebar"'),"manca la barra delle aree");
