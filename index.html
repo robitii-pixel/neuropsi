@@ -218,7 +218,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v18";
+const APPV="v19";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -453,7 +453,10 @@ const ORIENT_PATHS={
   visuospaziale:{label:"Difficoltà visuospaziali o gestuali",domini:["visuospaziale","prassie"],complementi:["attenzione","esecutive"],domanda:"La difficoltà riguarda esplorazione dello spazio, costruzione, riconoscimento o uso dei gesti?"},
   globale:{label:"Cambiamento cognitivo non definito",domini:["screening"],complementi:["attenzione","mem-verbale","linguaggio","esecutive","visuospaziale","autonomia"],domanda:"Quali domini emergono dal colloquio, dallo screening e dal funzionamento quotidiano?"},
   umore:{label:"Umore, apatia o comportamento",domini:["umore","comportamento"],complementi:["attenzione","autonomia"],domanda:"Quali sintomi sono presenti, da quando, con quale impatto e con quali segnali di sicurezza?"},
-  autonomia:{label:"Riduzione dell'autonomia",domini:["autonomia"],complementi:["mem-verbale","esecutive","visuospaziale","comportamento"],domanda:"Quali attività sono cambiate e quali fattori cognitivi, motori, sensoriali o ambientali possono spiegarlo?"}
+  autonomia:{label:"Riduzione dell'autonomia",domini:["autonomia"],complementi:["mem-verbale","esecutive","visuospaziale","comportamento"],domanda:"Quali attività sono cambiate e quali fattori cognitivi, motori, sensoriali o ambientali possono spiegarlo?"},
+  psichiatria:{label:"Sintomi psichiatrici o emotivi",domini:["umore","comportamento"],complementi:["attenzione","esecutive","autonomia"],domanda:"Sono presenti sintomi dell'umore, ansia, trauma, alterazioni del pensiero, sostanze o rischi immediati che richiedono un percorso dedicato?"},
+  neurosviluppo:{label:"Possibile neurodivergenza",domini:["attenzione","esecutive","cog-sociale"],complementi:["linguaggio","mdl","autonomia"],domanda:"Le caratteristiche sono presenti fin dall'infanzia e in più contesti, oppure rappresentano un cambiamento acquisito?"},
+  "disabilita-intellettiva":{label:"Difficoltà cognitive presenti dallo sviluppo",domini:["autonomia","linguaggio","mdl"],complementi:["attenzione","esecutive","cog-sociale"],domanda:"Sono documentabili limitazioni del funzionamento intellettivo e adattivo comparse nel periodo dello sviluppo?"}
 };
 function trainingPath(id){return ORIENT_PATHS[id]||ORIENT_PATHS.globale;}
 function combinedInitialPath(ids){
@@ -467,6 +470,20 @@ function combinedInitialPath(ids){
     domanda:paths.map(p=>p.domanda).join(" ")};
 }
 function trainingDomain(id){return TRAINING_DOMAINS[id]||{nome:domName(id),cosa:"Esplora il dominio indicato.",lettura:"Integrare sempre più fonti e condizioni di validità.",esempio:"Un singolo risultato non basta per una conclusione clinica."};}
+
+const TRANSVERSE_MODULES=[
+  {id:"depressione-ansia",area:"psichiatria",titolo:"Depressione, ansia e rischio",scopo:"Distinguere sintomi emotivi, rallentamento, ruminazione e rischio immediato da un disturbo neurocognitivo acquisito.",valutare:["Colloquio clinico e decorso","Impatto funzionale","Rischio suicidario e protezione","Sonno, farmaci e condizioni mediche"],strumenti:"WHO-5, PHQ-9 e GAD-7 sono già disponibili come screening aperti; non formulano diagnosi."},
+  {id:"bipolare-psicosi",area:"psichiatria",titolo:"Mania, bipolarità e sintomi psicotici",scopo:"Rilevare alterazioni episodiche di umore, energia, sonno, pensiero, percezione e comportamento che possono modificare la valutazione cognitiva.",valutare:["Stato mentale attuale","Decorso episodico e baseline","Rischio, capacità e necessità di urgenza","Sostanze, farmaci e cause neurologiche"],strumenti:"È richiesto un colloquio specialistico prioritario; le scale non sono sufficienti e devono essere autorizzate nel contesto appropriato."},
+  {id:"trauma-sostanze",area:"psichiatria",titolo:"Trauma, dissociazione e sostanze",scopo:"Esplorare fattori che possono produrre intrusività, evitamento, ipervigilanza, disconnessione, fluttuazioni o alterata validità.",valutare:["Cronologia rispetto ai sintomi cognitivi","Uso attuale e pregresso di sostanze","Dissociazione e trigger","Sicurezza e comorbidità"],strumenti:"Usare interviste e scale validate per popolazione e lingua; i contenuti non sono riprodotti nell'app."},
+  {id:"adhd",area:"neurosviluppo",titolo:"ADHD nell'adulto",scopo:"Valutare un pattern persistente di disattenzione e/o impulsività con esordio evolutivo e impatto in più contesti.",valutare:["Storia infantile e scolastica","Sintomi in almeno due contesti","Compromissione attuale","Sonno, umore, sostanze e altre alternative"],strumenti:"Le rating scale sono strumenti di supporto: secondo NICE non sono sufficienti da sole per la diagnosi."},
+  {id:"autismo",area:"neurosviluppo",titolo:"Autismo nell'adulto",scopo:"Esplorare caratteristiche persistenti di comunicazione e interazione sociale, rigidità/interessi e sensibilità sensoriali presenti dallo sviluppo.",valutare:["Storia evolutiva e documenti scolastici","Informazioni da familiare o altro informatore, se possibile","Osservazione diretta","Funzionamento, masking, sensorialità e comorbidità"],strumenti:"AQ-10 può orientare l'invio secondo NICE; la diagnosi richiede una valutazione completa da professionisti competenti."},
+  {id:"disabilita-intellettiva",area:"disabilita-intellettiva",titolo:"Disabilità intellettiva",scopo:"Definire un profilo di funzionamento e bisogni di supporto, distinguendolo da un declino cognitivo acquisito.",valutare:["Funzionamento intellettivo standardizzato","Comportamento adattivo concettuale, sociale e pratico","Esordio nel periodo dello sviluppo","Cultura, lingua, comunicazione e fattori sensoriali/motori"],strumenti:"Servono strumenti standardizzati autorizzati per abilità intellettive e adattive; il solo quoziente intellettivo non basta."},
+  {id:"apprendimento",area:"disabilita-intellettiva",titolo:"Disturbi specifici dell'apprendimento",scopo:"Distinguere difficoltà circoscritte di lettura, scrittura o calcolo da disabilità intellettiva, ADHD, fattori scolastici o disturbi acquisiti.",valutare:["Storia scolastica e interventi ricevuti","Abilità specifiche standardizzate","Funzionamento intellettivo generale","Lingua, sensorialità e opportunità educative"],strumenti:"Richiede prove standardizzate appropriate per età, lingua e scolarità; l'app offre solo orientamento."}
+];
+function transverseModules(problemIds){
+  const areas=new Set((problemIds||[]).filter(id=>["psichiatria","neurosviluppo","disabilita-intellettiva"].includes(id)));
+  return TRANSVERSE_MODULES.filter(m=>areas.has(m.area));
+}
 
 /* Profili interamente simulati: formulazioni funzionali descrittive,
    mai diagnosi eziologiche e mai applicabili automaticamente a casi reali. */
@@ -1738,8 +1755,19 @@ function combinedBuilder(){
     <p class="muted small">La distinzione lieve/maggiore dipende qui soltanto dallo scenario didattico di autonomia. In un caso reale richiede anamnesi, informatore, osservazione, strumenti validati e giudizio clinico.</p>
   </div>`;
 }
+function transverseCard(m){
+  return `<details class="test-card transverse-card"><summary><span class="nm">${esc(m.titolo)}</span>
+    <span class="badge lv2b">modulo trasversale</span></summary><div class="body">
+    <p><strong>Scopo:</strong> ${esc(m.scopo)}</p>
+    <p><strong>Valutare:</strong></p><ul>${m.valutare.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    <div class="banner warn"><strong>Strumenti:</strong> ${esc(m.strumenti)}</div>
+    <p class="muted small">Il modulo orienta l'approfondimento e non attribuisce una diagnosi.
+    Verificare sempre popolazione, versione, lingua, formazione richiesta e licenza.</p>
+  </div></details>`;
+}
 function viewFormazione(){
   const path=combinedInitialPath([...trainingChoices]);const tests=trainingTests(path);
+  const transverse=transverseModules(path.problemi);
   const domPrincipali=path.domini.map(trainingDomain);
   const domComplementari=path.complementi.map(trainingDomain);
   const pathButtons=Object.entries(ORIENT_PATHS).map(([id,p])=>
@@ -1774,13 +1802,18 @@ function viewFormazione(){
     <p class="muted small">Le schede spiegano scopo e significato; non mostrano item protetti,
     consegne standardizzate, tavole, norme o soglie.</p>
     <div class="training-grid">${tests.map(trainingCard).join("")}</div>
-    <h4 style="margin-top:1rem">4. Combinazione di più domini</h4>
+    <h4 style="margin-top:1rem">4. Psichiatria e neurosviluppo</h4>
+    <p class="muted small">Questi moduli compaiono quando selezioni “Sintomi psichiatrici o emotivi”,
+    “Possibile neurodivergenza” o “Difficoltà cognitive presenti dallo sviluppo”. Restano separati
+    dalle diagnosi neurocognitive acquisite.</p>
+    ${transverse.length?transverse.map(transverseCard).join(""):'<div class="banner info">Nessun modulo trasversale selezionato. Aggiungi uno dei tre problemi iniziali dedicati se è pertinente al caso didattico.</div>'}
+    <h4 style="margin-top:1rem">5. Combinazione di più domini</h4>
     ${combinedBuilder()}
-    <h4 style="margin-top:1rem">5. Profili simulati con ipotesi funzionali</h4>
+    <h4 style="margin-top:1rem">6. Profili simulati con ipotesi funzionali</h4>
     <p>Apri un caso per confrontare pattern cognitivo, autonomia, condizioni di validità,
     possibili alternative e passi successivi. Nessun profilo formula una diagnosi eziologica.</p>
     ${SIM_PROFILES.map(simProfileCard).join("")}
-    <h4 style="margin-top:1rem">6. Palestra di conduzione</h4>
+    <h4 style="margin-top:1rem">7. Palestra di conduzione</h4>
     <p>Queste esercitazioni usano stimoli creati dall'app. Il risultato resta solo sullo schermo,
     non viene salvato e non entra in profili, confronti o sintesi.</p>
     <div class="training-grid">${exercises}</div>

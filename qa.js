@@ -27,6 +27,7 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
   "ADMIN_NOTA","ADMIN_VERSIONE","ADMIN_TESTS","mulberry32","genDigits","spanInit","spanNext",
   "TRAINING_DOMAINS","ORIENT_PATHS","trainingPath","combinedInitialPath","trainingDomain",
+  "TRANSVERSE_MODULES","transverseModules",
   "SIM_PROFILES","simProfile",
   "COMBO_DOMAIN_IDS","combinedTeaching",
   "CANC_TARGET","genCanc","cancResult","ORIENT_DOMANDE","orientResult",
@@ -614,7 +615,7 @@ t("esercitazioni generiche: nessun contenuto di strumenti protetti",()=>{
   ok(L.ORIENT_DOMANDE.every(q=>q.endsWith("?")));
 });
 t("orientamento didattico: percorsi, domini e fallback completi",()=>{
-  const richiesti=["memoria","attenzione","linguaggio","esecutive","visuospaziale","globale","umore","autonomia"];
+  const richiesti=["memoria","attenzione","linguaggio","esecutive","visuospaziale","globale","umore","autonomia","psichiatria","neurosviluppo","disabilita-intellettiva"];
   richiesti.forEach(id=>{
     const p=L.trainingPath(id);
     ok(p.label&&p.domanda&&p.domini.length,"percorso incompleto: "+id);
@@ -633,6 +634,18 @@ t("problemi iniziali combinati: unisce domini e rimuove duplicati",()=>{
   ok(!p.complementi.some(d=>p.domini.includes(d)),"dominio ripetuto tra principali e complementari");
   const fallback=L.combinedInitialPath([]);eq(fallback.problemi,["globale"]);
   const ripulito=L.combinedInitialPath(["memoria","memoria","inesistente"]);eq(ripulito.problemi,["memoria"]);
+});
+t("moduli trasversali: psichiatria, neurosviluppo e disabilità intellettiva",()=>{
+  ok(L.TRANSVERSE_MODULES.length>=7);
+  const tutti=L.transverseModules(["psichiatria","neurosviluppo","disabilita-intellettiva"]);
+  eq(tutti.length,L.TRANSVERSE_MODULES.length);
+  ok(tutti.some(m=>m.id==="autismo")&&tutti.some(m=>m.id==="adhd"));
+  ok(tutti.some(m=>m.id==="disabilita-intellettiva")&&tutti.some(m=>m.id==="depressione-ansia"));
+  eq(L.transverseModules(["memoria","autonomia"]),[]);
+  L.TRANSVERSE_MODULES.forEach(m=>{
+    ok(m.scopo.length>50&&m.valutare.length>=4&&m.strumenti.length>40,"modulo incompleto: "+m.id);
+    ok(/non|richiede|servono|supporto/i.test(m.strumenti),"limite diagnostico poco chiaro: "+m.id);
+  });
 });
 t("profili simulati: ipotesi funzionali complete e mai eziologiche automatiche",()=>{
   ok(L.SIM_PROFILES.length>=8,"servono almeno otto profili didattici");
@@ -739,6 +752,7 @@ t("HTML: percorso formativo ed esercitazioni separati dal registro",()=>{
   ok(/Componi un profilo multidominio/.test(html),"manca il compositore multidominio");
   ["combo-domain","combo-autonomy","combo-validity"].forEach(a=>ok(html.includes('data-action="'+a+'"'),"manca l'azione "+a));
   ok(/Quali sono i problemi iniziali/.test(html)&&/trainingChoices\.has/.test(html),"i problemi iniziali non sono multiselezionabili");
+  ok(/Psichiatria e neurosviluppo/.test(html)&&/function transverseCard\(/.test(html),"manca l'area trasversale");
 });
 t("HTML: navigazione principale separa formazione e registro",()=>{
   ok(html.includes('id="modebar"'),"manca la barra delle aree");

@@ -56,6 +56,15 @@ umore/comportamento e autonomia possono essere scelti contemporaneamente. La map
 i domini principali, elimina i duplicati, separa quelli complementari e aggiorna le schede
 pertinenti. L'ordine di selezione non attribuisce priorità o gravità clinica.
 
+## Psichiatria e neurosviluppo (v19)
+
+Tre nuovi problemi iniziali attivano moduli trasversali distinti: sintomi psichiatrici o
+emotivi, possibile neurodivergenza e difficoltà cognitive presenti dallo sviluppo. Le schede
+formative coprono depressione/ansia/rischio, bipolarità/psicosi, trauma/sostanze, ADHD,
+autismo adulto, disabilità intellettiva e disturbi specifici dell'apprendimento. Le scale sono
+presentate solo come supporto: autismo e ADHD richiedono valutazioni cliniche complete; la
+disabilità intellettiva richiede funzionamento intellettivo e adattivo con esordio evolutivo.
+
 ## Percorso clinico (8 passi)
 
 1. **Sessione e quesito** — codice pseudonimo obbligatorio; età, sesso, scolarità,
