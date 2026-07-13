@@ -28,6 +28,7 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "ADMIN_NOTA","ADMIN_VERSIONE","ADMIN_TESTS","mulberry32","genDigits","spanInit","spanNext",
   "TRAINING_DOMAINS","ORIENT_PATHS","trainingPath","trainingDomain",
   "SIM_PROFILES","simProfile",
+  "COMBO_DOMAIN_IDS","combinedTeaching",
   "CANC_TARGET","genCanc","cancResult","ORIENT_DOMANDE","orientResult",
   "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport","buildStructuredReport",
   "exportPayload","sanitizeSession","migrateV1","parseImport","demoSession","demoSessions","nowISO","uid"];
@@ -636,6 +637,19 @@ t("profili simulati: ipotesi funzionali complete e mai eziologiche automatiche",
   ok(L.simProfile("acuto").allerta&&/urgenza/i.test(L.simProfile("acuto").ipotesi));
   eq(L.simProfile("inesistente"),null);
 });
+t("compositore multidominio: combina domini, autonomia e validità",()=>{
+  const poco=L.combinedTeaching(["mem-verbale"],"conservata","adeguata");
+  ok(!poco.pronto&&/almeno due domini/i.test(poco.titolo));
+  const lieve=L.combinedTeaching(["mem-verbale","esecutive"],"conservata","adeguata");
+  ok(lieve.pronto&&!lieve.sospeso&&lieve.gravita==="lieve");
+  ok(/amnestico-dysexecutive/.test(lieve.titolo)&&/multidominio/.test(lieve.formulazione));
+  const maggiore=L.combinedTeaching(["attenzione","velocita","esecutive"],"ridotta","adeguata");
+  ok(maggiore.gravita==="maggiore"&&/attentivo-dysexecutive/.test(maggiore.titolo));
+  const sospeso=L.combinedTeaching(["linguaggio","mem-verbale"],"ridotta","insufficiente");
+  ok(sospeso.sospeso&&/sospesa/i.test(sospeso.formulazione));
+  const ripulito=L.combinedTeaching(["linguaggio","linguaggio","falso","esecutive"],"conservata","adeguata");
+  eq(ripulito.domini,["linguaggio","esecutive"]);
+});
 t("mulberry32: deterministico per seme, diverso tra semi",()=>{
   const a=L.mulberry32(42),b=L.mulberry32(42),c=L.mulberry32(43);
   const va=[a(),a(),a()],vb=[b(),b(),b()],vc=[c(),c(),c()];
@@ -712,6 +726,8 @@ t("HTML: percorso formativo ed esercitazioni separati dal registro",()=>{
   ok(!/e\.versioneProva=ADMIN_VERSIONE/.test(html),"il risultato didattico scrive ancora nella prova clinica");
   ok(/Profili simulati con ipotesi funzionali/.test(html),"manca la sezione dei profili simulati");
   ok(/function simProfileCard\(/.test(html),"manca la resa dei casi simulati");
+  ok(/Componi un profilo multidominio/.test(html),"manca il compositore multidominio");
+  ["combo-domain","combo-autonomy","combo-validity"].forEach(a=>ok(html.includes('data-action="'+a+'"'),"manca l'azione "+a));
 });
 t("HTML: navigazione principale separa formazione e registro",()=>{
   ok(html.includes('id="modebar"'),"manca la barra delle aree");

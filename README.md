@@ -39,6 +39,15 @@ Ogni caso separa pattern, autonomia, validità, ipotesi funzionale, alternative 
 successivi. Le formulazioni non attribuiscono automaticamente un'eziologia; il caso acuto
 indica di interrompere i test e attivare una valutazione medica tempestiva.
 
+## Compositore multidominio (v17)
+
+Nel percorso didattico è possibile selezionare due o più domini cognitivi, modificare
+l'autonomia simulata e dichiarare se i dati sono attendibili. L'app costruisce un esempio di
+formulazione funzionale multidominio (per esempio amnestico-dysexecutive,
+attentivo-dysexecutive rallentato, amnestico-linguistico o visuospaziale-prassico). Se la
+validità è insufficiente la formulazione viene sospesa; la distinzione lieve/maggiore segue
+lo scenario di autonomia e resta esplicitamente didattica, non diagnostica.
+
 ## Percorso clinico (8 passi)
 
 1. **Sessione e quesito** — codice pseudonimo obbligatorio; età, sesso, scolarità,

@@ -218,7 +218,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v16";
+const APPV="v17";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -471,6 +471,20 @@ const SIM_PROFILES=[
   {id:"acuto",titolo:"Cambiamento acuto e fluttuante: fermare la valutazione",scenario:"Persona di 81 anni inviata durante ricovero; da due giorni alterna sonnolenza, agitazione, disorientamento e difficoltà a seguire richieste.",validita:"Vigilanza fluttuante e rapido cambiamento rispetto al funzionamento abituale.",pattern:["Attenzione marcatamente instabile","Disorientamento variabile","Risposte rallentate o incoerenti","Possibili alterazioni percettive e del ritmo sonno-veglia"],autonomia:"Peggioramento improvviso rispetto alla settimana precedente.",ipotesi:"Valutazione neuropsicologica non interpretabile; possibile delirium o stato confusionale acuto da valutare con urgenza.",perche:"L'esordio in ore o giorni e la fluttuazione richiedono accertamento medico della causa, non una diagnosi neurocognitiva cronica basata sui test.",alternative:["Infezione o squilibrio metabolico","Effetti o sospensione di farmaci","Dolore, disidratazione o ritenzione","Evento neurologico acuto"],passi:["Interrompere la valutazione estesa","Attivare valutazione medica tempestiva","Raccogliere baseline da caregiver e cartella","Rivalutare la cognizione dopo la risoluzione del quadro acuto"],allerta:true}
 ];
 function simProfile(id){return SIM_PROFILES.find(p=>p.id===id)||null;}
+const COMBO_DOMAIN_IDS=["attenzione","velocita","mdl","mem-verbale","mem-visiva","linguaggio","esecutive","visuospaziale","prassie","cog-sociale"];
+function combinedTeaching(domains,autonomia,validita){
+  const ds=[...new Set((domains||[]).filter(d=>COMBO_DOMAIN_IDS.includes(d)))];
+  if(ds.length<2)return {pronto:false,titolo:"Seleziona almeno due domini",formulazione:"Un profilo multidominio richiede difficoltà convergenti in almeno due aree cognitive.",lettura:"Non sommare test diversi: verifica che ogni dominio sia sostenuto da più dati coerenti."};
+  if(validita==="insufficiente")return {pronto:true,sospeso:true,titolo:"Profilo multidominio non interpretabile",formulazione:"Esempio didattico: formulazione funzionale sospesa per condizioni di validità insufficienti.",lettura:"Prima di classificare il profilo occorre chiarire o ridurre i fattori interferenti e raccogliere dati attendibili."};
+  const has=x=>ds.includes(x);let pattern="multidominio misto";let lettura="Descrivere il peso relativo dei domini, le dissociazioni e la coerenza con il funzionamento quotidiano.";
+  if(has("mem-verbale")&&has("esecutive")){pattern="amnestico-dysexecutive";lettura="Confronta ritenzione e riconoscimento con recupero strategico, flessibilità e monitoraggio.";}
+  else if(has("attenzione")&&has("velocita")&&has("esecutive")){pattern="attentivo-dysexecutive rallentato";lettura="Separa lentezza, instabilità attentiva e controllo esecutivo, considerando motricità, farmaci e sonno.";}
+  else if(has("linguaggio")&&has("mem-verbale")){pattern="amnestico-linguistico";lettura="Distingui difficoltà di codifica verbale, accesso lessicale e comprensione delle consegne.";}
+  else if(has("visuospaziale")&&has("prassie")){pattern="visuospaziale-prassico";lettura="Distingui percezione, esplorazione, organizzazione costruttiva e programmazione gestuale.";}
+  else if(has("linguaggio")&&has("esecutive")){pattern="linguistico-dysexecutive";lettura="Verifica quanto la ridotta generazione verbale dipenda da accesso lessicale o controllo strategico.";}
+  const gravita=autonomia==="ridotta"?"maggiore":"lieve";
+  return {pronto:true,sospeso:false,titolo:"Profilo "+pattern,formulazione:"Esempio didattico: possibile disturbo neurocognitivo "+gravita+" multidominio, a prevalenza "+pattern+".",lettura,domini:ds,gravita};
+}
 /* generatore deterministico: con lo stesso seme produce la stessa serie */
 function mulberry32(seed){
   let a=seed>>>0;
@@ -1642,6 +1656,9 @@ function viewRegistro(){
 
 let trainingChoice="memoria";
 const trainingResults={};
+const combinedSelected=new Set(["mem-verbale","esecutive"]);
+let combinedAutonomy="conservata";
+let combinedValidity="adeguata";
 function trainingLicense(t){
   if(t.licenza==="aperta")return "strumento aperto";
   if(t.licenza==="gratuita-ufficiale")return "materiale ufficiale gratuito";
@@ -1688,6 +1705,29 @@ function simProfileCard(p){
     </div>
   </details>`;
 }
+function combinedBuilder(){
+  const out=combinedTeaching([...combinedSelected],combinedAutonomy,combinedValidity);
+  const domainButtons=COMBO_DOMAIN_IDS.map(id=>{
+    const on=combinedSelected.has(id);return `<button class="mini${on?" on":""}" data-action="combo-domain" data-id="${id}" aria-pressed="${on}">${esc(trainingDomain(id).nome)}</button>`;
+  }).join("");
+  return `<div class="card lv2">
+    <h4>Componi un profilo multidominio</h4>
+    <p class="muted small">Seleziona almeno due domini. L'ordine non stabilisce automaticamente quale sia prevalente: la prevalenza va motivata con pattern, osservazioni e autonomia.</p>
+    <div class="stato-row">${domainButtons}</div>
+    <p><strong>Autonomia simulata</strong></p>
+    <div class="stato-row">
+      <button class="mini${combinedAutonomy==="conservata"?" on":""}" data-action="combo-autonomy" data-val="conservata">Indipendenza conservata</button>
+      <button class="mini${combinedAutonomy==="ridotta"?" on":""}" data-action="combo-autonomy" data-val="ridotta">Indipendenza ridotta</button>
+    </div>
+    <p><strong>Validità simulata</strong></p>
+    <div class="stato-row">
+      <button class="mini${combinedValidity==="adeguata"?" on":""}" data-action="combo-validity" data-val="adeguata">Dati attendibili</button>
+      <button class="mini${combinedValidity==="insufficiente"?" on":""}" data-action="combo-validity" data-val="insufficiente">Validità insufficiente</button>
+    </div>
+    <div class="banner ${out.sospeso?"warn":"info"}"><strong>${esc(out.titolo)}</strong><br>${esc(out.formulazione)}<br><span class="small">${esc(out.lettura)}</span></div>
+    <p class="muted small">La distinzione lieve/maggiore dipende qui soltanto dallo scenario didattico di autonomia. In un caso reale richiede anamnesi, informatore, osservazione, strumenti validati e giudizio clinico.</p>
+  </div>`;
+}
 function viewFormazione(){
   const path=trainingPath(trainingChoice);const tests=trainingTests(path);
   const domPrincipali=path.domini.map(trainingDomain);
@@ -1723,11 +1763,13 @@ function viewFormazione(){
     <p class="muted small">Le schede spiegano scopo e significato; non mostrano item protetti,
     consegne standardizzate, tavole, norme o soglie.</p>
     <div class="training-grid">${tests.map(trainingCard).join("")}</div>
-    <h4 style="margin-top:1rem">4. Profili simulati con ipotesi funzionali</h4>
+    <h4 style="margin-top:1rem">4. Combinazione di più domini</h4>
+    ${combinedBuilder()}
+    <h4 style="margin-top:1rem">5. Profili simulati con ipotesi funzionali</h4>
     <p>Apri un caso per confrontare pattern cognitivo, autonomia, condizioni di validità,
     possibili alternative e passi successivi. Nessun profilo formula una diagnosi eziologica.</p>
     ${SIM_PROFILES.map(simProfileCard).join("")}
-    <h4 style="margin-top:1rem">5. Palestra di conduzione</h4>
+    <h4 style="margin-top:1rem">6. Palestra di conduzione</h4>
     <p>Queste esercitazioni usano stimoli creati dall'app. Il risultato resta solo sullo schermo,
     non viene salvato e non entra in profili, confronti o sintesi.</p>
     <div class="training-grid">${exercises}</div>
@@ -2521,6 +2563,13 @@ const ACTIONS={
   "cards-open":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=true;});},
   "cards-close":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=false;});},
   "training-path":btn=>{trainingChoice=btn.dataset.id;render();window.scrollTo(0,0);},
+  "combo-domain":btn=>{
+    const id=btn.dataset.id;if(!COMBO_DOMAIN_IDS.includes(id))return;
+    if(combinedSelected.has(id))combinedSelected.delete(id);else combinedSelected.add(id);
+    render();
+  },
+  "combo-autonomy":btn=>{combinedAutonomy=btn.dataset.val==="ridotta"?"ridotta":"conservata";render();},
+  "combo-validity":btn=>{combinedValidity=btn.dataset.val==="insufficiente"?"insufficiente":"adeguata";render();},
   /* --- esercitazioni didattiche con prove generiche --- */
   "admin-start":btn=>{
     const tid=btn.dataset.id;const cfg=ADMIN_TESTS[tid];if(!cfg)return;
