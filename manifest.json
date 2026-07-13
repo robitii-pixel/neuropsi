@@ -1,7 +1,7 @@
 {
-  "name": "NeuroScreen Clinico",
+  "name": "NeuroScreen — orientamento e formazione",
   "short_name": "NeuroScreen",
-  "description": "Prototipo locale di valutazione neuropsicologica guidata. Nessun dato lascia il dispositivo.",
+  "description": "Orientamento alla valutazione neuropsicologica e addestramento con esempi originali. Nessun dato lascia il dispositivo.",
   "lang": "it",
   "start_url": ".",
   "scope": ".",

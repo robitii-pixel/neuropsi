@@ -1,11 +1,26 @@
-# NeuroScreen Clinico
+# NeuroScreen — orientamento e formazione
 
-Piattaforma **locale** per la valutazione neuropsicologica guidata: somministrazione
-assistita, registrazione dei risultati, profilo per domini, selezione adattiva degli
-approfondimenti e bozza di referto. Un solo file (`index.html`), nessun backend, nessuna
-dipendenza: si apre con un doppio clic in qualunque browser moderno, anche offline.
+Strumento **locale** di orientamento alla valutazione neuropsicologica e addestramento:
+mappa il quesito sui domini, presenta schede formative dei test, significato clinico ed
+esempi originali. Un solo file (`index.html`), nessun backend, nessuna dipendenza: si apre
+con un doppio clic in qualunque browser moderno, anche offline.
 
-**Versione dimostrativa, non autorizzata per uso clinico reale.**
+**Non è un test neuropsicologico e non produce dati clinici dalle esercitazioni.**
+
+## Percorso didattico (v14)
+
+- Otto punti di partenza: memoria, attenzione/lentezza, linguaggio, funzioni esecutive,
+  visuospaziale/prassie, cambiamento globale, umore/comportamento, autonomia.
+- Flow chart automatica: quesito → domini principali → famiglie di strumenti → lettura
+  integrata con validità, errori qualitativi, autonomia e anamnesi.
+- Schede formative ricavate dal catalogo di 55 strumenti, mostrate in gruppi pertinenti di
+  massimo 12, con scopo, significato clinico, esempio originale e stato dei materiali.
+  Nessun item, tavola, consegna standardizzata, norma o soglia dei test protetti.
+- Palestra di conduzione con fluenze, span, cancellazione e orientamento generati dall'app.
+  I risultati restano solo sullo schermo: non vengono salvati e non alimentano profilo,
+  confronto o referto.
+- Il precedente registro resta accessorio per organizzare risultati ottenuti separatamente
+  con materiali originali, autorizzazioni e norme appropriate.
 
 ## Percorso clinico (8 passi)
 
@@ -17,17 +32,11 @@ dipendenza: si apre con un doppio clic in qualunque browser moderno, anche offli
    referto e considerate nell'affidabilità del profilo.
 3. **Batteria di primo livello** — composta liberamente dal catalogo (batteria di base
    suggerita, mai rigida), con durata stimata.
-4. **Somministrazione** — per ogni prova: stato (completata / non eseguita / non
+4. **Registro accessorio** — per ogni prova: stato (completata / non eseguita / non
    interpretabile con motivo), cronometro, punteggio grezzo validato sul range del
    test, tempo, errori, autocorrezioni, intrusioni, perseverazioni, versione della
-   prova, punteggio corretto, classificazione del clinico, note qualitative.
-   **Prove generiche somministrabili dall'app** (stimoli generati, mai item di
-   strumenti protetti): fluenze verbali con timer e contatori, span di cifre
-   avanti/indietro con sequenze casuali e regola dei due tentativi, cancellazione
-   con griglia generata (bersagli/omissioni/falsi allarmi), colloquio di
-   orientamento con domande generiche. I risultati vengono scritti nei campi con
-   versione "digitale-generica-v1" e nota automatica; l'etichetta ricorda che la
-   prova non è standardizzata e non è confrontabile con le norme carta-e-matita.
+   prova, punteggio corretto, classificazione del clinico, note qualitative. I dati
+   devono provenire da strumenti disponibili legittimamente fuori dall'app.
    Indicatore di avanzamento, apertura/chiusura di tutte le schede e disposizione
    a due colonne sugli schermi larghi (tablet in orizzontale e desktop).
 5. **Profilo per domini** (13 domini + screening) — prove disponibili/somministrate,
@@ -160,7 +169,8 @@ fonte normativa validata."* — e il punteggio corretto resta inseribile a mano.
 
 ## Controlli
 
-- `npm run check` — 69 test senza dipendenze su catalogo, modello dati, validazioni,
+- `npm run check` — 70+ test senza dipendenze su catalogo, percorso formativo,
+  separazione tra esercitazioni e dati clinici, modello dati, validazioni,
   motore di scoring (incl. pacchetto fittizio di collaudo usato solo nei test),
   profilo, regole adattive, referto, import/migrazione e vincoli (nessuna risorsa
   esterna, nessun cut-off nel codice, nessun termine diagnostico nei testi generati).

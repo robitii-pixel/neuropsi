@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="NeuroScreen Clinico — piattaforma locale per la valutazione neuropsicologica guidata. Versione dimostrativa: nessun dato lascia questo dispositivo.">
+<meta name="description" content="NeuroScreen — strumento locale di orientamento alla valutazione neuropsicologica e addestramento con esempi originali.">
 <meta name="theme-color" content="#0b5cad">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icona-192.png">
 <link rel="apple-touch-icon" href="icona-192.png">
-<title>NeuroScreen Clinico</title>
+<title>NeuroScreen — orientamento e formazione</title>
 <style>
 :root{
   --bg:#f5f7f9; --card:#ffffff; --ink:#1a2530; --muted:#4a5a68; --line:#d5dde3;
@@ -118,6 +118,13 @@ details.test-card .body{padding:0 .8rem .8rem;border-top:1px solid var(--line)}
 .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin:.7rem 0}
 .flow .node{border:1px solid var(--line);border-radius:10px;padding:.65rem;background:#fff;font-size:.85rem}
 .flow .node.active{border:2px solid var(--brand);background:#e7f0fa}
+.training-paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.55rem;margin:.75rem 0}
+.training-paths button{text-align:left;min-height:64px}
+.training-paths button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.training-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:.7rem}
+.training-card{border:1px solid var(--line);border-radius:10px;padding:.75rem;background:#fff}
+.training-card h4{margin-bottom:.3rem}
+.training-card p{font-size:.88rem}
 .assist-card{max-width:760px;margin:0 auto;background:#fff;border:2px solid var(--brand);border-radius:14px;padding:1.2rem}
 .assist-item{border-top:1px solid var(--line);padding:.9rem 0}
 .assist-item select{margin-top:.4rem}
@@ -171,9 +178,9 @@ table.mini th{background:var(--na-bg);font-weight:600}
 <body>
 
 <header class="topbar no-print">
-  <h1>NeuroScreen Clinico</h1>
+  <h1>NeuroScreen — orientamento e formazione</h1>
   <span class="ver" id="appver"></span>
-  <span class="demo-tag">VERSIONE DIMOSTRATIVA</span>
+  <span class="demo-tag">USO DIDATTICO</span>
   <span class="sess" id="topSess" hidden></span>
 </header>
 
@@ -182,13 +189,11 @@ table.mini th{background:var(--na-bg);font-weight:600}
 <main id="app"></main>
 
 <footer class="disclaimer no-print">
-  <p><strong>Versione dimostrativa, non autorizzata per uso clinico reale.</strong>
-  L'applicazione non contiene stimoli, istruzioni o materiali di test protetti, né tabelle
-  normative, e non produce diagnosi: registra il percorso valutativo, calcola solo ciò che è
-  configurato con fonti verificate e genera bozze sempre modificabili, sotto la piena
-  responsabilità del professionista. Tutti i dati restano su questo dispositivo (localStorage
-  del browser). Non inserire nomi, codici fiscali o altri identificativi diretti:
-  usare esclusivamente il codice pseudonimo.</p>
+  <p><strong>Strumento di orientamento e addestramento, non un test neuropsicologico.</strong>
+  Gli esempi e le esercitazioni sono originali, non standardizzati e non producono punteggi
+  clinici. L'app non contiene materiali protetti né norme e non formula diagnosi. L'eventuale
+  registro professionale accessorio richiede strumenti originali, autorizzazioni e norme
+  appropriate. I dati restano sul dispositivo; usare solo codici pseudonimi.</p>
 </footer>
 
 <div id="toasts" aria-live="polite"></div>
@@ -205,7 +210,7 @@ table.mini th{background:var(--na-bg);font-weight:600}
    anche dalla suite qa.js. Non spostare i marcatori NS-LOGIC.
    ================================================================ */
 /*NS-LOGIC-START*/
-const APPV="v13";
+const APPV="v14";
 const LS_KEY="neuroscreen_v1";
 const SCHEMA=2;
 
@@ -398,13 +403,13 @@ function validitaInterferenze(val){
   return {interferenti:inter,daSegnalare:segnala};
 }
 
-/* ---------- Somministrazione digitale di prove GENERICHE ----------
+/* ---------- Esercitazioni didattiche con prove GENERICHE ----------
    Solo paradigmi liberi con stimoli GENERATI dall'app (mai item di
    strumenti protetti): fluenze verbali, span di cifre con sequenze
    casuali, cancellazione con griglia generata, colloquio di
    orientamento con domande generiche di pratica clinica. */
-const ADMIN_NOTA="Somministrazione digitale generica, non standardizzata: il punteggio grezzo non è confrontabile con le norme delle versioni carta-e-matita. Per usare uno strumento normato, somministrare il materiale originale e registrare i punteggi a mano.";
-const ADMIN_VERSIONE="digitale-generica-v1";
+const ADMIN_NOTA="Esercitazione didattica originale e non standardizzata. Il risultato serve solo ad allenare la conduzione e l'osservazione: non va inserito nel profilo, nel referto o confrontato con norme cliniche.";
+const ADMIN_VERSIONE="esercitazione-didattica-v1";
 const ADMIN_TESTS={
   "fluenza-fon":{tipo:"fluenza",durataSec:60,consegna:"Chiedere di dire, in un minuto, più parole possibile che inizino con la lettera concordata (nomi propri e derivati esclusi). Toccare un pulsante per ogni risposta."},
   "fluenza-sem":{tipo:"fluenza",durataSec:60,consegna:"Chiedere di dire, in un minuto, più elementi possibile della categoria concordata. Toccare un pulsante per ogni risposta."},
@@ -413,6 +418,37 @@ const ADMIN_TESTS={
   "cancellazione":{tipo:"canc",consegna:"Porgere il tablet alla persona: deve toccare TUTTI i triangoli, il più velocemente possibile, senza toccare le altre figure. Premere Termina quando ha finito."},
   "orientamento":{tipo:"orient",consegna:"Porre le domande in modo naturale, senza suggerire. Segnare ogni risposta come adeguata o non adeguata; usare Salta se la domanda non è applicabile."}
 };
+
+/* Percorsi formativi: orientano il ragionamento senza scegliere una batteria
+   per una persona reale e senza fornire soglie o interpretazioni diagnostiche. */
+const TRAINING_DOMAINS={
+  screening:{nome:"Screening globale",cosa:"Fornisce una prima mappa multidominio e aiuta a decidere quali aree approfondire.",lettura:"Un totale globale non spiega da solo il profilo: contano sottodomini, qualità degli errori, autonomia e condizioni di validità.",esempio:"Un punteggio globale ridotto con udito non corretto richiede prima di discutere l'interferenza sensoriale, non di attribuire subito il risultato a un disturbo cognitivo."},
+  attenzione:{nome:"Attenzione",cosa:"Esplora mantenimento del compito, selezione degli stimoli e controllo delle omissioni.",lettura:"Omissioni, fluttuazioni e rallentamento possono dipendere anche da sonno, farmaci, dolore, vista o affaticamento.",esempio:"Molte omissioni concentrate nella parte finale suggeriscono di verificare calo della vigilanza e affaticamento prima di interpretare il dato."},
+  velocita:{nome:"Velocità di elaborazione",cosa:"Osserva quanto rapidamente la persona elabora informazioni semplici mantenendo accuratezza.",lettura:"Tempo e precisione vanno letti insieme; difficoltà motorie o visive possono rallentare senza indicare un deficit cognitivo specifico.",esempio:"Una prestazione lenta ma accurata con artrite della mano richiede di separare la componente motoria dalla velocità cognitiva."},
+  mdl:{nome:"Memoria di lavoro",cosa:"Valuta mantenimento e manipolazione temporanea di informazioni.",lettura:"Il confronto tra semplice mantenimento e manipolazione aiuta a distinguere carico attentivo e controllo esecutivo, senza essere diagnostico.",esempio:"Ripetizione semplice adeguata ma difficoltà quando l'ordine va trasformato orienta ad approfondire il controllo esecutivo."},
+  "mem-verbale":{nome:"Memoria episodica verbale",cosa:"Studia apprendimento, ritenzione, recupero e riconoscimento di materiale verbale.",lettura:"Curva di apprendimento, richiamo differito, beneficio da indizi e falsi riconoscimenti descrivono meccanismi diversi.",esempio:"Un richiamo libero debole con netto beneficio dal riconoscimento suggerisce di esplorare le strategie di recupero, senza trasformare il pattern in diagnosi."},
+  "mem-visiva":{nome:"Memoria episodica visiva",cosa:"Esamina apprendimento e recupero di informazioni visive non verbali.",lettura:"La qualità della copia iniziale e le abilità visuospaziali condizionano ciò che può essere ricordato.",esempio:"Un richiamo visivo povero dopo una copia disorganizzata richiede di considerare codifica e pianificazione, non solo memoria."},
+  linguaggio:{nome:"Linguaggio",cosa:"Esplora denominazione, comprensione, ripetizione, produzione lessicale, lettura e scrittura.",lettura:"Tipologia degli errori, frequenza delle parole, scolarità, lingua madre e disturbi sensoriali sono essenziali per la lettura.",esempio:"Circonlocuzioni con comprensione conservata portano a esaminare accesso lessicale e natura degli errori, non soltanto il numero di risposte."},
+  esecutive:{nome:"Funzioni esecutive",cosa:"Esamina flessibilità, inibizione, pianificazione, monitoraggio e generazione strategica.",lettura:"Le prove esecutive sono multifattoriali e risentono di velocità, linguaggio, memoria di lavoro e comprensione della consegna.",esempio:"Numerose perseverazioni con comprensione adeguata della regola orientano ad approfondire flessibilità e monitoraggio."},
+  visuospaziale:{nome:"Abilità visuospaziali",cosa:"Osserva analisi spaziale, esplorazione, costruzione e organizzazione visiva.",lettura:"Vista, neglect, difficoltà motorie e pianificazione possono modificare la prestazione; il tipo di errore è spesso più informativo del totale.",esempio:"Una copia frammentaria ma accurata nei dettagli suggerisce di osservare la strategia organizzativa oltre al punteggio."},
+  prassie:{nome:"Prassie",cosa:"Esplora la capacità di programmare e realizzare gesti appresi.",lettura:"Comprensione, forza, sensibilità e imitazione vanno controllate prima di attribuire gli errori alla programmazione gestuale.",esempio:"Un gesto scorretto su comando ma migliore per imitazione richiede un'analisi qualitativa delle vie di accesso al gesto."},
+  "cog-sociale":{nome:"Cognizione sociale",cosa:"Esamina riconoscimento emotivo, inferenze sociali e comprensione delle intenzioni.",lettura:"Contesto culturale, linguaggio e funzionamento esecutivo possono influire e vanno integrati con osservazione e anamnesi.",esempio:"Una risposta letterale in scenari sociali complessi va confrontata con comprensione linguistica e flessibilità cognitiva."},
+  autonomia:{nome:"Autonomia",cosa:"Descrive attività di base e strumentali e il loro cambiamento rispetto al funzionamento abituale.",lettura:"La causa della dipendenza può essere cognitiva, motoria, sensoriale, ambientale o sociale: serve una fonte informativa attendibile.",esempio:"La gestione dei farmaci delegata per scelta familiare non equivale automaticamente a perdita di capacità."},
+  umore:{nome:"Umore e benessere",cosa:"Rileva sintomi emotivi che possono richiedere colloquio e approfondimento.",lettura:"I questionari sono screening, non diagnosi; sicurezza, durata, impatto funzionale e contesto clinico hanno priorità.",esempio:"Un risultato elevato richiede colloquio diretto e valutazione del rischio, non un'etichetta automatica."},
+  comportamento:{nome:"Comportamento e fattori interferenti",cosa:"Raccoglie cambiamenti comportamentali, sonno, fatica, apatia e informazioni del caregiver.",lettura:"Frequenza, gravità, esordio, carico assistenziale e discrepanze tra fonti aiutano a interpretare il quadro.",esempio:"Apatia riferita dal caregiver con tristezza negata dalla persona richiede di distinguere motivazione, umore e consapevolezza."}
+};
+const ORIENT_PATHS={
+  memoria:{label:"Difficoltà di memoria",domini:["mem-verbale","mem-visiva","mdl"],complementi:["attenzione","esecutive","autonomia"],domanda:"La difficoltà riguarda apprendimento, recupero, riconoscimento o gestione quotidiana?"},
+  attenzione:{label:"Disattenzione o lentezza",domini:["attenzione","velocita","mdl"],complementi:["esecutive"],domanda:"Prevalgono omissioni, fluttuazioni, lentezza o difficoltà a mantenere più informazioni?"},
+  linguaggio:{label:"Difficoltà linguistiche",domini:["linguaggio"],complementi:["mem-verbale","esecutive"],domanda:"La difficoltà riguarda accesso alle parole, comprensione, ripetizione, lettura o scrittura?"},
+  esecutive:{label:"Disorganizzazione o rigidità",domini:["esecutive","mdl"],complementi:["velocita","cog-sociale","autonomia"],domanda:"Si osservano difficoltà di pianificazione, cambio di regola, inibizione o monitoraggio?"},
+  visuospaziale:{label:"Difficoltà visuospaziali o gestuali",domini:["visuospaziale","prassie"],complementi:["attenzione","esecutive"],domanda:"La difficoltà riguarda esplorazione dello spazio, costruzione, riconoscimento o uso dei gesti?"},
+  globale:{label:"Cambiamento cognitivo non definito",domini:["screening"],complementi:["attenzione","mem-verbale","linguaggio","esecutive","visuospaziale","autonomia"],domanda:"Quali domini emergono dal colloquio, dallo screening e dal funzionamento quotidiano?"},
+  umore:{label:"Umore, apatia o comportamento",domini:["umore","comportamento"],complementi:["attenzione","autonomia"],domanda:"Quali sintomi sono presenti, da quando, con quale impatto e con quali segnali di sicurezza?"},
+  autonomia:{label:"Riduzione dell'autonomia",domini:["autonomia"],complementi:["mem-verbale","esecutive","visuospaziale","comportamento"],domanda:"Quali attività sono cambiate e quali fattori cognitivi, motori, sensoriali o ambientali possono spiegarlo?"}
+};
+function trainingPath(id){return ORIENT_PATHS[id]||ORIENT_PATHS.globale;}
+function trainingDomain(id){return TRAINING_DOMAINS[id]||{nome:domName(id),cosa:"Esplora il dominio indicato.",lettura:"Integrare sempre più fonti e condizioni di validità.",esempio:"Un singolo risultato non basta per una conclusione clinica."};}
 /* generatore deterministico: con lo stesso seme produce la stessa serie */
 function mulberry32(seed){
   let a=seed>>>0;
@@ -1393,7 +1429,7 @@ const STEPS=[
   {id:"sessione",n:1,label:"Sessione"},
   {id:"validita",n:2,label:"Validità"},
   {id:"batteria",n:3,label:"Batteria"},
-  {id:"prove",n:4,label:"Primo livello"},
+  {id:"prove",n:4,label:"Registro prove"},
   {id:"profilo",n:5,label:"Profilo"},
   {id:"secondo",n:6,label:"Secondo livello",lv2:true},
   {id:"confronto",n:7,label:"Confronto"},
@@ -1451,13 +1487,13 @@ function render(){
   if(s){top.hidden=false;top.textContent="Sessione: "+(s.code||"(senza codice)");}
   else top.hidden=true;
   renderStepper();
-  const views={home:viewHome,sessione:viewSessione,validita:viewValidita,batteria:viewBatteria,
+  const views={home:viewHome,formazione:viewFormazione,sessione:viewSessione,validita:viewValidita,batteria:viewBatteria,
     prove:viewProve,profilo:viewProfilo,secondo:viewSecondo,confronto:viewConfronto,referto:viewReferto};
   $("#app").innerHTML=(views[currentView]||viewHome)();
 }
 function go(view){
-  if(view!=="home"&&!cur()){currentView="home";render();return;}
-  if(view!=="home"&&!stepEnabled(view)){toast(stepDisabledMsg(view)||"Passaggio non ancora disponibile.");return;}
+  if(view!=="home"&&view!=="formazione"&&!cur()){currentView="home";render();return;}
+  if(view!=="home"&&view!=="formazione"&&!stepEnabled(view)){toast(stepDisabledMsg(view)||"Passaggio non ancora disponibile.");return;}
   currentView=view;render();window.scrollTo(0,0);
 }
 function navRow(prev,next,nextLabel,extra){
@@ -1491,20 +1527,28 @@ function viewHome(){
   const nNorme=(state.normPacks||[]).length;
   const nMateriali=(state.materialPacks||[]).length;
   return `
-  <div class="banner warn"><strong>Versione dimostrativa, non autorizzata per uso clinico reale.</strong>
-  Nessun materiale di test protetto e nessuna norma integrata; i dati restano su questo dispositivo.</div>
-  <div class="banner info">Percorso in 7 passi: dati di sessione e quesito clinico, condizioni di validità,
-  composizione della batteria di primo livello, registrazione di punteggi/tempi/errori, profilo per
-  domini, approfondimenti di secondo livello proposti dall'app (sempre modificabili) e bozza di referto.</div>
+  <div class="banner info"><strong>Nuovo scopo principale: orientamento e formazione.</strong>
+  L'app aiuta a capire quale dominio esplorare, quali famiglie di prove considerare e come leggere
+  qualitativamente i risultati. Non sceglie una batteria per un paziente e non sostituisce manuali,
+  formazione, licenze o giudizio clinico.</div>
+  <div class="card lv1">
+    <h3>Percorso di orientamento e addestramento</h3>
+    <p>Scegli il problema iniziale, segui la mappa dei domini, consulta le schede dei test e prova
+    esercitazioni originali che non generano dati clinici.</p>
+    <div class="btnrow"><button class="primary" data-action="goto" data-view="formazione">Apri il percorso didattico</button></div>
+  </div>
+  <div class="banner warn"><strong>Il registro sottostante è solo accessorio.</strong>
+  Può organizzare dati ottenuti altrove con strumenti legittimamente disponibili, ma le
+  esercitazioni dell'app non entrano nel profilo né nella sintesi.</div>
   <div class="card">
-    <h3>Nuova valutazione</h3>
+    <h3>Nuovo caso di ragionamento o registro autorizzato</h3>
     <p class="muted small">Identificare il paziente SOLO con un codice pseudonimo (es. "NP-2026-014").
     L'abbinamento codice–persona va conservato altrove, fuori da questa applicazione.</p>
     <label for="newCode">Codice pseudonimo</label>
     <input type="text" id="newCode" maxlength="24" autocomplete="off" placeholder="es. NP-2026-014">
     <div class="field-err" id="newCodeErr"></div>
     <div class="btnrow">
-      <button class="primary" data-action="new-session">Crea valutazione</button>
+      <button class="primary" data-action="new-session">Crea caso</button>
       <button data-action="new-demo">Crea sessione dimostrativa (dati fittizi)</button>
     </div>
   </div>
@@ -1546,6 +1590,77 @@ function viewHome(){
       <button data-action="import">Importa da file</button>
       <button data-action="wipe-all" class="danger" ${list.length||nNorme?"":"disabled"}>Cancella tutti i dati</button>
     </div>
+  </div>`;
+}
+
+let trainingChoice="memoria";
+const trainingResults={};
+function trainingLicense(t){
+  if(t.licenza==="aperta")return "strumento aperto";
+  if(t.licenza==="gratuita-ufficiale")return "materiale ufficiale gratuito";
+  if(t.licenza==="generico")return "paradigma generico";
+  return "materiale o licenza da verificare";
+}
+function trainingTests(path){
+  const primary=new Set(path.domini);
+  const direct=TESTS.filter(t=>primary.has(t.dom)||(primary.has("screening")&&t.cat==="screening"));
+  const secondary=TESTS.filter(t=>!direct.includes(t)&&t.domSec.some(d=>primary.has(d)));
+  return direct.concat(secondary).slice(0,12);
+}
+function trainingCard(t){
+  const d=trainingDomain(t.dom);const g=testGuide(t.id);
+  return `<div class="training-card">
+    <h4>${esc(t.nome)} <span class="muted">(${esc(t.sigla)})</span></h4>
+    <p><span class="badge lic">${esc(trainingLicense(t))}</span>
+    <span class="badge lic">${esc(d.nome)}</span></p>
+    <p><strong>Che cosa esplora:</strong> ${esc(g===DEFAULT_GUIDE?d.cosa:g.scopo)}</p>
+    <p><strong>Significato clinico:</strong> ${esc(d.lettura)}</p>
+    <p><strong>Esempio didattico originale:</strong> ${esc(d.esempio)}</p>
+    <p class="muted"><strong>Limite:</strong> nessun risultato di questa scheda è diagnostico.
+    Per somministrare lo strumento servono versione, manuale, norme e autorizzazioni appropriate.</p>
+    ${g.officialUrl?`<p><a href="${esc(g.officialUrl)}" target="_blank" rel="noopener">Apri la fonte ufficiale</a></p>`:""}
+  </div>`;
+}
+function viewFormazione(){
+  const path=trainingPath(trainingChoice);const tests=trainingTests(path);
+  const domPrincipali=path.domini.map(trainingDomain);
+  const domComplementari=path.complementi.map(trainingDomain);
+  const pathButtons=Object.entries(ORIENT_PATHS).map(([id,p])=>
+    `<button class="${trainingChoice===id?"on":""}" data-action="training-path" data-id="${id}">${esc(p.label)}</button>`).join("");
+  const exercises=Object.keys(ADMIN_TESTS).map(tid=>{
+    const t=TEST_BY_ID[tid];return `<div class="training-card"><h4>${esc(t.nome)}</h4>
+      <p class="muted">Allenamento alla consegna, alla gestione del tempo e all'osservazione degli errori.</p>
+      ${adminPanel(tid,null)}</div>`;
+  }).join("");
+  return `<div class="card lv1">
+    <h3>Orientamento alla valutazione neuropsicologica</h3>
+    <p>Parti dal quesito, controlla le condizioni di validità, individua i domini e solo dopo
+    considera gli strumenti. Questa mappa è formativa: non prescrive una batteria per una persona reale.</p>
+    <h4>1. Qual è il problema iniziale?</h4>
+    <div class="training-paths">${pathButtons}</div>
+    <div class="flow" aria-label="Mappa di orientamento didattico">
+      <div class="node active"><strong>1. Quesito</strong><br>${esc(path.label)}</div>
+      <div class="node"><strong>2. Domini</strong><br>${esc(domPrincipali.map(d=>d.nome).join(", "))}</div>
+      <div class="node"><strong>3. Strumenti</strong><br>Confronta scopo, validità, lingua, durata e licenza</div>
+      <div class="node"><strong>4. Integrazione</strong><br>Pattern, errori, autonomia, anamnesi e fonti convergenti</div>
+    </div>
+    <div class="banner info"><strong>Domanda guida:</strong> ${esc(path.domanda)}</div>
+    <div class="banner warn"><strong>Prima di ogni prova:</strong> controlla vista, udito, motricità,
+    lingua, dolore, sonno, vigilanza, farmaci e collaborazione. Un fattore interferente può cambiare
+    il significato del risultato.</div>
+    <h4>2. Domini principali</h4>
+    <div class="training-grid">${domPrincipali.map(d=>`<div class="training-card"><h4>${esc(d.nome)}</h4><p>${esc(d.cosa)}</p><p><strong>Come leggerlo:</strong> ${esc(d.lettura)}</p><p><strong>Esempio:</strong> ${esc(d.esempio)}</p></div>`).join("")}</div>
+    <h4 style="margin-top:1rem">Domini da integrare</h4>
+    <p class="muted">${esc(domComplementari.map(d=>d.nome).join("; ")||"Nessuno predefinito: dipende dal caso e dalle condizioni di validità.")}</p>
+    <h4 style="margin-top:1rem">3. Schede degli strumenti pertinenti (${tests.length})</h4>
+    <p class="muted small">Le schede spiegano scopo e significato; non mostrano item protetti,
+    consegne standardizzate, tavole, norme o soglie.</p>
+    <div class="training-grid">${tests.map(trainingCard).join("")}</div>
+    <h4 style="margin-top:1rem">4. Palestra di conduzione</h4>
+    <p>Queste esercitazioni usano stimoli creati dall'app. Il risultato resta solo sullo schermo,
+    non viene salvato e non entra in profili, confronti o sintesi.</p>
+    <div class="training-grid">${exercises}</div>
+    <div class="btnrow"><button data-action="goto" data-view="home">Torna alla pagina iniziale</button></div>
   </div>`;
 }
 
@@ -1651,11 +1766,11 @@ function viewBatteria(){
   const dur=(s.batteria||[]).reduce((a,tid)=>a+(TEST_BY_ID[tid]&&TEST_BY_ID[tid].durataMin||0),0);
   return `
   <div class="card lv1">
-    <h3>Passo 3 — Batteria di primo livello</h3>
+    <h3>Passo 3 — Mappa delle prove da considerare</h3>
     <p class="muted small">Il catalogo elenca solo metadati organizzativi: la somministrazione avviene
     con i materiali originali di cui il clinico dispone legittimamente, e qui si registrano punteggi,
-    tempi, errori e osservazioni. Tutti i test pubblicati sono marcati "licenza da verificare" e
-    "norme non integrate" finché non vengono configurate fonti verificate.</p>
+    tempi, errori e osservazioni. Gli strumenti aperti sono indicati esplicitamente; per gli altri
+    occorre verificare materiale, licenza, formazione richiesta e norme appropriate.</p>
     <div class="btnrow" style="margin-top:0">
       <button data-action="battery-base">Seleziona batteria di base suggerita</button>
       <button data-action="battery-clear">Svuota selezione</button>
@@ -1663,7 +1778,7 @@ function viewBatteria(){
       <span class="muted">Selezionate: <strong id="batCount">${(s.batteria||[]).length}</strong> prove${dur?" (~"+dur+" min)":""}</span>
     </div>
     ${groups}
-    ${navRow("validita","prove","Avanti: somministrazione")}
+    ${navRow("validita","prove","Avanti: registro delle prove")}
   </div>`;
 }
 
@@ -1714,10 +1829,9 @@ function materialForm(pack,e,assistito){
     <p class="muted small">Materiale importato localmente — fonte: ${esc(pack.fonte)}; licenza: ${esc(pack.licenza.riferimento)}.</p></div>`;
 }
 
-/* ---------- Pannelli di somministrazione digitale (prove generiche) ----------
-   Stato transitorio in memoria: i risultati vengono scritti nella
-   somministrazione solo alla conclusione, con versione della prova
-   "digitale-generica-v1" e nota automatica. */
+/* ---------- Pannelli delle esercitazioni didattiche ----------
+   Stato e risultati restano solo in memoria e non confluiscono mai
+   nelle somministrazioni, nel profilo o nella sintesi. */
 const adminState={};
 function admRemaining(st){return Math.max(0,Math.ceil((st.endTs-Date.now())/1000));}
 function adminPanel(tid,e){
@@ -1725,11 +1839,13 @@ function adminPanel(tid,e){
   if(!cfg)return "";
   const st=adminState[tid];
   if(!st){
+    const risultato=trainingResults[tid];
     return `<div class="adm">
-      <p style="margin-top:0"><span class="badge lv2b">prova generica somministrabile</span></p>
+      <p style="margin-top:0"><span class="badge lv2b">esercitazione didattica</span></p>
       <p class="muted small">${esc(cfg.consegna)}</p>
       <p class="muted small">${esc(ADMIN_NOTA)}</p>
-      <button data-action="admin-start" data-id="${tid}" class="adm-big">Avvia la somministrazione digitale</button>
+      ${risultato?`<div class="banner info"><strong>Ultima esercitazione:</strong> ${esc(risultato.nota)}</div>`:""}
+      <button data-action="admin-start" data-id="${tid}" class="adm-big">${risultato?"Ripeti":"Avvia"} l'esercitazione</button>
     </div>`;
   }
   let corpo="";
@@ -1771,25 +1887,20 @@ function adminPanel(tid,e){
       </div>`;
     }).join("");
   }
-  const concludi=(cfg.tipo==="fluenza"||cfg.tipo==="canc")?`<button class="mini" data-action="admin-stop" data-id="${tid}">Termina e registra</button>`
-    :(cfg.tipo==="orient"?`<button class="mini primary" data-action="admin-orient-done" data-id="${tid}">Concludi e registra</button>`:"");
+  const concludi=(cfg.tipo==="fluenza"||cfg.tipo==="canc")?`<button class="mini" data-action="admin-stop" data-id="${tid}">Termina l'esercitazione</button>`
+    :(cfg.tipo==="orient"?`<button class="mini primary" data-action="admin-orient-done" data-id="${tid}">Concludi l'esercitazione</button>`:"");
   return `<div class="adm">${corpo}
     <div class="btnrow">${concludi}<span class="spacer"></span>
       <button class="mini danger" data-action="admin-cancel" data-id="${tid}">Annulla senza registrare</button></div>
   </div>`;
 }
 function adminFinish(tid,campi,nota){
-  const s=cur();if(!s)return;
-  const e=s.somministrazioni[tid]||(s.somministrazioni[tid]=newSomm());
-  Object.keys(campi).forEach(k=>{e[k]=String(campi[k]);});
-  e.stato="completato";
-  e.versioneProva=ADMIN_VERSIONE;
-  e.note=(e.note&&e.note.trim()?e.note.trim()+" ":"")+nota;
   const st=adminState[tid];
   if(st&&st.int)clearInterval(st.int);
   delete adminState[tid];
-  touchSession();persist();render();
-  toast("Prova registrata dalla somministrazione digitale. Classificazione e interpretazione restano al clinico.","ok");
+  trainingResults[tid]={campi:Object.assign({},campi),nota,versione:ADMIN_VERSIONE};
+  render();
+  toast("Esercitazione conclusa. Il risultato non è stato salvato come dato clinico.","ok");
 }
 function viewProve(){
   const s=cur();
@@ -1819,7 +1930,6 @@ function viewProve(){
       </summary>
       <div class="body">
         ${guidePanel(tid)}
-        ${adminPanel(tid,e)}
         ${materialPack?materialForm(materialPack,e,false):(tid==="who5"?who5Form(e,false):"")}
         <div class="stato-row">
           ${stati.map(([v,l])=>`<button class="mini${e.stato===v?" on":""}" data-action="som-stato" data-id="${tid}" data-val="${v}">${l}</button>`).join("")}
@@ -1868,7 +1978,10 @@ function viewProve(){
   }).join("");
   return `
   <div class="card lv1">
-    <h3>Passo 4 — Somministrazione e registrazione (primo livello)</h3>
+    <h3>Passo 4 — Registro di prove autorizzate</h3>
+    <div class="banner warn"><strong>Qui non ci sono test protetti.</strong> Inserire soltanto risultati
+    ottenuti con materiali originali legittimamente disponibili. Le esercitazioni didattiche sono
+    separate e non possono compilare questi campi.</div>
     <p class="muted small">Per ogni prova: stato, cronometro, punteggio grezzo, tempo, errori,
     autocorrezioni, intrusioni, perseverazioni, punteggio corretto e classificazione del clinico.
     Il grezzo da solo non classifica mai la prestazione.</p>
@@ -2336,11 +2449,10 @@ const ACTIONS={
   },
   "cards-open":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=true;});},
   "cards-close":()=>{document.querySelectorAll("details.test-card").forEach(d=>{d.open=false;});},
-  /* --- somministrazione digitale di prove generiche --- */
+  "training-path":btn=>{trainingChoice=btn.dataset.id;render();window.scrollTo(0,0);},
+  /* --- esercitazioni didattiche con prove generiche --- */
   "admin-start":btn=>{
     const tid=btn.dataset.id;const cfg=ADMIN_TESTS[tid];if(!cfg)return;
-    const s=cur();const e=s.somministrazioni[tid];
-    if(e&&e.stato==="completato"&&!confirm("La prova risulta già completata: una nuova somministrazione digitale sovrascriverà punteggio, tempo ed errori. Continuare?"))return;
     const seed=(Date.now()^Math.floor(Math.random()*0xffffffff))>>>0;
     if(cfg.tipo==="fluenza"){
       const st={tipo:"fluenza",counts:{v:0,i:0,p:0},durata:cfg.durataSec,endTs:Date.now()+cfg.durataSec*1000,int:null};
@@ -2378,7 +2490,7 @@ const ACTIONS={
     if(nuovo.done){
       const dir=ADMIN_TESTS[tid].dir;
       adminFinish(tid,{grezzo:nuovo.best},
-        "Span "+dir+" in somministrazione digitale generica: lunghezza massima "+nuovo.best+" su "+nuovo.prove+" sequenze presentate.");
+        "Span "+dir+" nell'esercitazione: lunghezza massima "+nuovo.best+" su "+nuovo.prove+" sequenze presentate. Dato non clinico.");
     }else{adminState[tid]=nuovo;render();}
   },
   "admin-cell":btn=>{
@@ -2394,12 +2506,12 @@ const ACTIONS={
       if(st.int)clearInterval(st.int);
       const trascorsi=Math.min(st.durata,st.durata-admRemaining(st));
       adminFinish(tid,{grezzo:st.counts.v,intrusioni:st.counts.i,perseverazioni:st.counts.p,tempoSec:trascorsi},
-        "Fluenza in somministrazione digitale generica ("+trascorsi+"s): "+st.counts.v+" risposte valide, "+st.counts.i+" intrusioni, "+st.counts.p+" perseverazioni.");
+        "Fluenza nell'esercitazione ("+trascorsi+"s): "+st.counts.v+" risposte valide, "+st.counts.i+" intrusioni, "+st.counts.p+" perseverazioni. Dato non clinico.");
     }else if(st.tipo==="canc"){
       const r=cancResult(st.grid,st.marcate);
       const trascorsi=Math.round((Date.now()-st.startTs)/1000);
       adminFinish(tid,{grezzo:r.colpiti,errori:r.falsiAllarmi,tempoSec:trascorsi},
-        "Cancellazione in somministrazione digitale generica: "+r.colpiti+"/"+r.bersagli+" bersagli, "+r.omissioni+" omissioni, "+r.falsiAllarmi+" falsi allarmi in "+trascorsi+"s.");
+        "Cancellazione nell'esercitazione: "+r.colpiti+"/"+r.bersagli+" bersagli, "+r.omissioni+" omissioni, "+r.falsiAllarmi+" falsi allarmi in "+trascorsi+"s. Dato non clinico.");
     }
   },
   "admin-orient":btn=>{
@@ -2411,7 +2523,7 @@ const ACTIONS={
     const r=orientResult(st.risposte);
     if(!r.valutate){toast("Segnare almeno una risposta prima di concludere.","error");return;}
     adminFinish(tid,{grezzo:r.adeguate},
-      "Colloquio di orientamento (domande generiche): "+r.adeguate+" risposte adeguate e "+r.nonAdeguate+" non adeguate su "+r.valutate+" valutate"+(r.saltate?" ("+r.saltate+" saltate)":"")+".");
+      "Colloquio di orientamento nell'esercitazione: "+r.adeguate+" risposte adeguate e "+r.nonAdeguate+" non adeguate su "+r.valutate+" valutate"+(r.saltate?" ("+r.saltate+" saltate)":"")+". Dato non clinico.");
   }
 };
 

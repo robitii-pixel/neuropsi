@@ -65,6 +65,8 @@ netti:
    passo 7 di confronto descrittivo, sezione 10 del referto; demo con coppia collegata)
 9. referto strutturato (JSON+TXT), versione della prova nel confronto, rifiniture
    tablet del passo 4 — FATTO in v5
-10. somministrazione digitale di prove generiche (fluenze, span, cancellazione,
-   orientamento) con stimoli generati — FATTO in v13
-11. hardening privacy/sicurezza oltre la demo — quando si uscirà dal perimetro locale
+10. esercitazioni digitali generiche (fluenze, span, cancellazione, orientamento)
+    con stimoli generati — FATTO in v13; separate dai dati clinici in v14
+11. conversione dello scopo principale in orientamento e formazione, con flow chart,
+    schede sul significato clinico ed esempi originali — FATTO in v14
+12. hardening privacy/sicurezza del registro accessorio — se verrà usato oltre la demo

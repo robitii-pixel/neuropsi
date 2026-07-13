@@ -1,4 +1,4 @@
-/* Smoke test end-to-end di NeuroScreen Clinico (percorso in 7 passi)
+/* Smoke test end-to-end di NeuroScreen (formazione + registro accessorio)
    su 3 viewport (desktop, tablet, smartphone). Strumento di sviluppo
    OPZIONALE: l'app non ha dipendenze; questo test richiede
    playwright-core e un Chromium in /opt/pw-browsers (o adattare EXE).
@@ -26,8 +26,19 @@ const VIEWPORTS=[
     page.on("console",m=>{if(m.type()==="error")errors.push("console: "+m.text());});
     await page.goto(URL);
 
-    ok(await page.title()==="NeuroScreen Clinico","titolo pagina");
-    ok((await page.textContent("body")).includes("non autorizzata per uso clinico reale"),"avviso versione dimostrativa");
+    ok(await page.title()==="NeuroScreen — orientamento e formazione","titolo pagina");
+    ok((await page.textContent("body")).includes("non un test neuropsicologico"),"avviso di uso didattico");
+
+    // percorso formativo separato dal registro
+    await page.click('button[data-view="formazione"]');
+    ok((await page.textContent("main")).includes("Orientamento alla valutazione neuropsicologica"),"percorso formativo aperto");
+    await page.click('button[data-action="training-path"][data-id="linguaggio"]');
+    ok((await page.textContent("main")).includes("Difficoltà linguistiche"),"mappa linguaggio selezionata");
+    await page.click('button[data-action="admin-start"][data-id="fluenza-fon"]');
+    await page.click('button[data-action="admin-count"][data-id="fluenza-fon"][data-kind="v"]');
+    await page.click('button[data-action="admin-stop"][data-id="fluenza-fon"]');
+    ok((await page.textContent("main")).includes("Dato non clinico"),"esercitazione marcata come non clinica");
+    await page.click('button[data-view="home"]');
 
     // validazione codice
     await page.fill("#newCode","nome cognome");
@@ -61,7 +72,6 @@ const VIEWPORTS=[
     await page.click('input[data-battery="mmse"]'); // toglie MMSE
     ok(Number(await page.textContent("#batCount"))===nSel-1,"deselezione aggiorna il contatore");
     await page.click('input[data-battery="mmse"]'); // lo rimette
-    await page.click('input[data-battery="cancellazione"]'); // per la somministrazione digitale
     await page.click('button.primary[data-action="goto-validated"][data-view="prove"]');
 
     // passo 4: somministrazione
@@ -73,42 +83,6 @@ const VIEWPORTS=[
     const fieldVal=async(tid,f)=>page.inputValue(`[data-som="${tid}"][data-field="${f}"]`);
     page.on("dialog",d=>d.accept());
 
-    // --- somministrazione digitale: fluenza (contatori + termina) ---
-    await ensureOpen("fluenza-fon");
-    ok((await page.textContent("#card_fluenza-fon")).includes("prova generica somministrabile"),"badge prova generica");
-    await page.click('button[data-action="admin-start"][data-id="fluenza-fon"]');
-    for(let i=0;i<3;i++)await page.click('button[data-action="admin-count"][data-id="fluenza-fon"][data-kind="v"]');
-    await page.click('button[data-action="admin-count"][data-id="fluenza-fon"][data-kind="i"]');
-    await page.click('button[data-action="admin-stop"][data-id="fluenza-fon"]');
-    ok(await fieldVal("fluenza-fon","grezzo")==="3","fluenza digitale: grezzo dai contatori");
-    ok(await fieldVal("fluenza-fon","intrusioni")==="1","fluenza digitale: intrusioni registrate");
-    ok(await fieldVal("fluenza-fon","versioneProva")==="digitale-generica-v1","fluenza digitale: versione marcata");
-    // --- somministrazione digitale: span di cifre (ok, poi due errori) ---
-    await ensureOpen("digit-avanti");
-    await page.click('button[data-action="admin-start"][data-id="digit-avanti"]');
-    ok((await page.textContent("#card_digit-avanti")).includes("Lunghezza 3"),"span digitale: parte da lunghezza 3");
-    await page.click('button[data-action="admin-span"][data-id="digit-avanti"][data-val="ok"]');
-    ok((await page.textContent("#card_digit-avanti")).includes("Lunghezza 4"),"span digitale: avanza a 4");
-    await page.click('button[data-action="admin-span"][data-id="digit-avanti"][data-val="ko"]');
-    await page.click('button[data-action="admin-span"][data-id="digit-avanti"][data-val="ko"]');
-    ok(await fieldVal("digit-avanti","grezzo")==="3","span digitale: grezzo = lunghezza massima riuscita");
-    // --- somministrazione digitale: orientamento (giudizi per domanda) ---
-    await ensureOpen("orientamento");
-    await page.click('button[data-action="admin-start"][data-id="orientamento"]');
-    await page.click('button[data-action="admin-orient"][data-id="orientamento"][data-i="0"][data-val="ok"]');
-    await page.click('button[data-action="admin-orient"][data-id="orientamento"][data-i="1"][data-val="ok"]');
-    await page.click('button[data-action="admin-orient"][data-id="orientamento"][data-i="2"][data-val="ko"]');
-    await page.click('button[data-action="admin-orient-done"][data-id="orientamento"]');
-    ok(await fieldVal("orientamento","grezzo")==="2","orientamento digitale: adeguate contate");
-    // --- somministrazione digitale: cancellazione (tocca tutti i bersagli) ---
-    await ensureOpen("cancellazione");
-    await page.click('button[data-action="admin-start"][data-id="cancellazione"]');
-    const bersagli=await page.$$eval(".canc-grid button",bs=>bs.map((b,i)=>({i,t:b.textContent.trim()==="▲"})).filter(x=>x.t).map(x=>x.i));
-    ok(bersagli.length===16,"cancellazione digitale: 16 bersagli generati");
-    for(const i of bersagli)await page.click(`.canc-grid button[data-i="${i}"]`);
-    await page.click('button[data-action="admin-stop"][data-id="cancellazione"]');
-    ok(await fieldVal("cancellazione","grezzo")==="16","cancellazione digitale: tutti i bersagli colpiti");
-    ok(await fieldVal("cancellazione","errori")==="0","cancellazione digitale: nessun falso allarme");
     await setStato("mmse","completato");
     await fill("mmse","grezzo","31");
     // l'errore di range compare al re-render (cambio stato di un'altra prova)

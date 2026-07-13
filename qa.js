@@ -26,6 +26,7 @@ const EXPORTS=["APPV","LS_KEY","SCHEMA","RATINGS","RATING_LABEL","DOMS","DOM_BY_
   "MODULES","MODULE_BY_ID","proposeModules","mergeSecondLevel",
   "LIMITI_CONFRONTO","comparableSessions","compareSessions","comparisonText","newFollowUp",
   "ADMIN_NOTA","ADMIN_VERSIONE","ADMIN_TESTS","mulberry32","genDigits","spanInit","spanNext",
+  "TRAINING_DOMAINS","ORIENT_PATHS","trainingPath","trainingDomain",
   "CANC_TARGET","genCanc","cancResult","ORIENT_DOMANDE","orientResult",
   "fmtDateIT","fmtSec","qualitativePhrases","resultsTable","buildReport","buildStructuredReport",
   "exportPayload","sanitizeSession","migrateV1","parseImport","demoSession","demoSessions","nowISO","uid"];
@@ -588,8 +589,8 @@ t("versioneProva: avvertenza esplicita nel testo del confronto e nel referto",()
   ok(L.buildReport(dopo,[],sessions).includes("versioni della prova diverse"),"avvertenza assente dal referto");
 });
 
-/* ---------- somministrazione digitale di prove generiche (v13) ---------- */
-t("prove generiche: definite solo per test del catalogo, con consegna e tipo validi",()=>{
+/* ---------- orientamento e addestramento (v14) ---------- */
+t("esercitazioni generiche: definite solo per test del catalogo, con consegna e tipo validi",()=>{
   const tipi=new Set(["fluenza","span","canc","orient"]);
   Object.keys(L.ADMIN_TESTS).forEach(id=>{
     ok(L.TEST_BY_ID[id],"test inesistente: "+id);
@@ -597,17 +598,29 @@ t("prove generiche: definite solo per test del catalogo, con consegna e tipo val
     ok(L.ADMIN_TESTS[id].consegna.length>30,"consegna troppo povera per "+id);
   });
   ["fluenza-fon","fluenza-sem","digit-avanti","digit-indietro","cancellazione","orientamento"]
-    .forEach(id=>ok(L.ADMIN_TESTS[id],"manca la somministrazione per "+id));
+    .forEach(id=>ok(L.ADMIN_TESTS[id],"manca l'esercitazione per "+id));
   ok(/non standardizzata/.test(L.ADMIN_NOTA),"nota di non standardizzazione assente");
-  eq(L.ADMIN_VERSIONE,"digitale-generica-v1");
+  ok(/non va inserito nel profilo, nel referto/i.test(L.ADMIN_NOTA),"separazione dai dati clinici non esplicita");
+  eq(L.ADMIN_VERSIONE,"esercitazione-didattica-v1");
 });
-t("prove generiche: nessun contenuto di strumenti protetti (stimoli generati, domande generiche)",()=>{
+t("esercitazioni generiche: nessun contenuto di strumenti protetti",()=>{
   /* le sequenze sono generate, non elencate; l'orientamento usa domande
      di colloquio generiche; nessun item MMSE/MoCA-specifico */
   ok(L.ORIENT_DOMANDE.length>=8);
   ok(!L.ORIENT_DOMANDE.some(q=>/parol[ae].*(ripet|ricord)|pentola|carta|casa|pane|gatto/i.test(q)),
     "domanda sospetta di derivare da item protetti");
   ok(L.ORIENT_DOMANDE.every(q=>q.endsWith("?")));
+});
+t("orientamento didattico: percorsi, domini e fallback completi",()=>{
+  const richiesti=["memoria","attenzione","linguaggio","esecutive","visuospaziale","globale","umore","autonomia"];
+  richiesti.forEach(id=>{
+    const p=L.trainingPath(id);
+    ok(p.label&&p.domanda&&p.domini.length,"percorso incompleto: "+id);
+    p.domini.concat(p.complementi).forEach(d=>ok(L.TRAINING_DOMAINS[d],"dominio formativo mancante: "+d));
+  });
+  eq(L.trainingPath("inesistente"),L.ORIENT_PATHS.globale);
+  ok(L.trainingDomain("mem-verbale").lettura.length>60);
+  ok(/slice\(0,12\)/.test(html),"le schede formative non hanno un limite mobile");
 });
 t("mulberry32: deterministico per seme, diverso tra semi",()=>{
   const a=L.mulberry32(42),b=L.mulberry32(42),c=L.mulberry32(43);
@@ -673,12 +686,16 @@ t("orientamento: conteggio adeguate/non adeguate/saltate",()=>{
   eq(r.saltate,L.ORIENT_DOMANDE.length-3);
   eq(L.orientResult({}).valutate,0);
 });
-t("HTML: pannelli di somministrazione digitale presenti con etichette corrette",()=>{
-  ok(html.includes('data-action="admin-start"'),"manca l'avvio della somministrazione");
+t("HTML: percorso formativo ed esercitazioni separati dal registro",()=>{
+  ok(html.includes('data-view="formazione"'),"manca l'accesso al percorso formativo");
+  ok(html.includes('data-action="admin-start"'),"manca l'avvio dell'esercitazione");
   ["admin-span","admin-count","admin-cell","admin-orient-done","admin-stop","admin-cancel"]
     .forEach(a=>ok(html.includes('data-action="'+a+'"'),"manca l'azione "+a));
-  ok(html.includes("prova generica somministrabile"),"manca il badge di prova generica");
+  ok(html.includes("esercitazione didattica"),"manca il badge didattico");
   ok(html.includes("Annulla senza registrare"),"manca l'annullamento");
+  ok(!/\$\{adminPanel\(tid,e\)\}/.test(html),"l'esercitazione compare ancora nel registro clinico");
+  ok(/trainingResults\[tid\]=/.test(html),"il risultato didattico non resta separato");
+  ok(!/e\.versioneProva=ADMIN_VERSIONE/.test(html),"il risultato didattico scrive ancora nella prova clinica");
 });
 
 /* ---------- vincoli sull'HTML ---------- */
@@ -687,8 +704,8 @@ t("HTML: nessuna risorsa esterna, nessuna chiamata di rete",()=>{
   ok(!/\bhref\s*=\s*["']https?:/i.test(html));
   ok(!/fetch\s*\(|XMLHttpRequest|navigator\.sendBeacon/i.test(html));
 });
-t("HTML: avviso versione dimostrativa e pseudonimizzazione presenti",()=>{
-  ok(/non autorizzata per uso clinico reale/i.test(html));
+t("HTML: avviso didattico e pseudonimizzazione presenti",()=>{
+  ok(/strumento di orientamento e addestramento, non un test neuropsicologico/i.test(html));
   ok(/codice pseudonimo/i.test(html));
   ok(/cancella tutti i dati/i.test(html.toLowerCase().replace(/\s+/g," "))||/wipe-all/.test(html));
 });

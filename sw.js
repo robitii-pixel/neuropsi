@@ -1,10 +1,10 @@
-/* Service worker di NeuroScreen Clinico.
+/* Service worker di NeuroScreen — orientamento e formazione.
    Strategia: per la pagina RETE-PRIMA ignorando la cache del browser
    (cache:"no-store", attesa massima 2,5s, fallback sull'ultima versione
    salvata) — mai cache-prima per index.html, altrimenti gli aggiornamenti
    non arrivano. Icone e manifest: cache-prima. */
 "use strict";
-const CACHE="neuroscreen-sw-v13";
+const CACHE="neuroscreen-sw-v14";
 /* index.html va salvata già all'installazione: la prima navigazione avviene
    prima che il service worker prenda il controllo, e senza questa copia
    l'app non si aprirebbe offline dopo una sola visita */
